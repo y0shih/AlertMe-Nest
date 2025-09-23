@@ -4,7 +4,7 @@ import { Admin } from './admin.entity';
 
 @Entity('roles')
 export class Role {
-	@PrimaryColumn({ type: 'varchar' })
+	@PrimaryColumn({ type: 'uuid' })
 	id: string;
 
 	@Column({

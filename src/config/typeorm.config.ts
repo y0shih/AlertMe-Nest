@@ -23,8 +23,8 @@ export const AppDataSource = new DataSource({
 	password,
 	database,
 	ssl: { rejectUnauthorized: false },
-	entities: ['src/**/*.entity.ts'],
-	migrations: ['src/migrations/*.ts'],
 	synchronize: false,
 	logging: process.env.NODE_ENV === 'development',
+	entities: ['src/**/*.entity.ts'],
+	migrations: ['src/migrations/*.ts'],
 });
