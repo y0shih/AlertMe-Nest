@@ -3,7 +3,9 @@ import { ReportsService } from './reports.service';
 import { Report } from '../../entities/report.entity';
 import { ReportStatus } from '../../enums/user-role.enum';
 import { CreateReportDto, UpdateReportDto } from '../../dto/reports.dto';
+import { ApiTags } from '@nestjs/swagger';
 
+@ApiTags('Reports')
 @Controller('reports')
 export class ReportsController {
 	constructor(private readonly reportsService: ReportsService) {}

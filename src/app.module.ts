@@ -15,6 +15,7 @@ import { ReportResponse } from './entities/report-response.entity';
 import { SosReport } from './entities/sos-report.entity';
 import { AuthModule } from './modules/auth/auth.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { UsersModule } from './modules/users/users.module';
 
 @Module({
 	imports: [
@@ -36,6 +37,7 @@ import { ReportsModule } from './modules/reports/reports.module';
 		TypeOrmModule.forFeature([Role, AuthUser, UserProfile, Admin, AdminProfile, Report, Task, ReportResponse, SosReport]),
 		AuthModule,
 		ReportsModule,
+		UsersModule,
 	],
 	controllers: [AppController],
 	providers: [AppService],
