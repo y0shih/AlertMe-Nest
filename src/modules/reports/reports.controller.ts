@@ -1,8 +1,9 @@
-import { Controller, Get, Post, Put, Delete, Param, Body } from '@nestjs/common';
-import { ReportsService } from './reports.service';
+import { Controller, Get, Post, Put, Delete, Param, Body, Query } from '@nestjs/common';
+import { ReportsService, PaginatedReportsResponse } from './reports.service';
 import { Report } from '../../entities/report.entity';
+import { SosReport } from '../../entities/sos-report.entity';
 import { ReportStatus } from '../../enums/user-role.enum';
-import { CreateReportDto, UpdateReportDto } from '../../dto/reports.dto';
+import { CreateReportDto, UpdateReportDto, CreateSosReportDto, ListReportsQueryDto } from '../../dto/reports.dto';
 import { ApiTags } from '@nestjs/swagger';
 
 @ApiTags('Reports')
@@ -10,9 +11,10 @@ import { ApiTags } from '@nestjs/swagger';
 export class ReportsController {
 	constructor(private readonly reportsService: ReportsService) {}
 
+	// Public listing with filters (auth temporarily disabled)
 	@Get()
-	async findAll(): Promise<Report[]> {
-		return this.reportsService.findAll();
+	async list(@Query() query: ListReportsQueryDto): Promise<PaginatedReportsResponse> {
+		return this.reportsService.listReports(query);
 	}
 
 	@Get(':id')
@@ -34,9 +36,10 @@ export class ReportsController {
 		return this.reportsService.findByStatus(status);
 	}
 
+	// Create standard report using provided user_id (auth temporarily disabled)
 	@Post()
 	async create(@Body() createReportDto: CreateReportDto): Promise<Report> {
-		return this.reportsService.create(createReportDto);
+		return this.reportsService.createStandardReport(createReportDto, (createReportDto as any).user_id);
 	}
 
 	@Put(':id')
@@ -47,5 +50,16 @@ export class ReportsController {
 	@Delete(':id')
 	async remove(@Param('id') id: string): Promise<void> {
 		return this.reportsService.remove(id);
+	}
+}
+
+@ApiTags('SOS Reports')
+@Controller('sos-reports')
+export class SosReportsController {
+	constructor(private readonly reportsService: ReportsService) {}
+
+	@Post()
+	async createSos(@Body() dto: CreateSosReportDto): Promise<SosReport> {
+		return this.reportsService.createSosReport(dto, (dto as any).user_id);
 	}
 }
