@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, Repository } from 'typeorm';
-import { Report } from '../entities/report.entity';
-import { ReportStatus } from '../enums/user-role.enum';
+import { Report } from '../../entities/report.entity';
+import { ReportStatus } from '../../enums/user-role.enum';
 
 @Injectable()
 export class ReportRepository extends Repository<Report> {
