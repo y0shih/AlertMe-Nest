@@ -3,6 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AuthUser } from '../../entities/auth-user.entity';
 import { UserProfile } from '../../entities/user-profile.entity';
+import { Admin } from '../../entities/admin.entity';
+import { AdminProfile } from '../../entities/admin-profile.entity';
 import { Role } from '../../entities/role.entity';
 import { AuthUserRepository } from './user.repository';
 import { CreateUserDto, UpdateUserDto, UserQueryDto, UserResponseDto, PaginatedUserResponse, UserSearchDto } from '../../dto/user.dto';
@@ -13,14 +15,14 @@ export class UsersService {
 		private readonly authUserRepository: AuthUserRepository,
 		@InjectRepository(UserProfile)
 		private readonly userProfileRepository: Repository<UserProfile>,
+		@InjectRepository(Admin)
+		private readonly adminRepository: Repository<Admin>,
+		@InjectRepository(AdminProfile)
+		private readonly adminProfileRepository: Repository<AdminProfile>,
 		@InjectRepository(Role)
 		private readonly roleRepository: Repository<Role>,
 	) {}
 
-	/**
-	 * Find all users with pagination and filtering
-	 * Requirements: 1.1, 2.1, 2.2, 2.4
-	 */
 	async findAll(query: UserQueryDto): Promise<PaginatedUserResponse> {
 		const { users, total } = await this.authUserRepository.findWithPagination(query);
 
@@ -41,10 +43,6 @@ export class UsersService {
 		};
 	}
 
-	/**
-	 * Find user by ID with proper error handling
-	 * Requirements: 3.1, 3.4
-	 */
 	async findById(id: string): Promise<UserResponseDto> {
 		if (!id) {
 			throw new BadRequestException('User ID is required');
@@ -62,10 +60,6 @@ export class UsersService {
 		return this.mapToUserResponse(user);
 	}
 
-	/**
-	 * Find user by email
-	 * Requirements: 2.3, 3.1
-	 */
 	async findByEmail(email: string): Promise<UserResponseDto> {
 		if (!email) {
 			throw new BadRequestException('Email is required');
@@ -80,13 +74,21 @@ export class UsersService {
 		return this.mapToUserResponse(user);
 	}
 
-	/**
-	 * Create new user with role assignment
-	 * Requirements: 4.1, 4.2
-	 */
 	async createUser(createUserDto: CreateUserDto): Promise<UserResponseDto> {
 		const { email, username, role_id } = createUserDto;
 
+		// Validate role exists
+		const role = await this.roleRepository.findOne({ where: { id: role_id } });
+		if (!role) {
+			throw new BadRequestException('Invalid role ID provided');
+		}
+
+		// Route to admin tables for staff/admin/superadmin
+		if (role.name === 'staff' || role.name === 'admin' || role.name === 'superadmin') {
+			return this.createAdminUser(email, username, role_id, role);
+		}
+
+		// Regular user creation (USER role)
 		// Check if user with email already exists
 		const existingUserByEmail = await this.authUserRepository.findByEmail(email);
 		if (existingUserByEmail) {
@@ -97,12 +99,6 @@ export class UsersService {
 		const existingUserByUsername = await this.authUserRepository.findByUsernameOrEmail(username);
 		if (existingUserByUsername && existingUserByUsername.profile?.username === username) {
 			throw new ConflictException('Username is already taken');
-		}
-
-		// Validate role exists
-		const role = await this.roleRepository.findOne({ where: { id: role_id } });
-		if (!role) {
-			throw new BadRequestException('Invalid role ID provided');
 		}
 
 		// Create user with profile in a transaction
@@ -146,10 +142,6 @@ export class UsersService {
 		}
 	}
 
-	/**
-	 * Update user profile with validation and username uniqueness checks
-	 * Requirements: 1.2, 3.1, 4.2
-	 */
 	async updateUser(id: string, updateUserDto: UpdateUserDto): Promise<UserResponseDto> {
 		if (!id) {
 			throw new BadRequestException('User ID is required');
@@ -228,10 +220,6 @@ export class UsersService {
 		}
 	}
 
-	/**
-	 * Delete user with proper cleanup and cascade handling
-	 * Requirements: 4.1, 4.2
-	 */
 	async deleteUser(id: string): Promise<void> {
 		if (!id) {
 			throw new BadRequestException('User ID is required');
@@ -269,13 +257,69 @@ export class UsersService {
 		}
 	}
 
-	/**
-	 * Search users with multiple criteria
-	 * Requirements: 2.1, 2.2, 2.3, 2.4, 2.5
-	 */
 	async searchUsers(criteria: UserSearchDto): Promise<UserResponseDto[]> {
 		const users = await this.authUserRepository.searchUsers(criteria);
 		return users.map((user) => this.mapToUserResponse(user));
+	}
+
+	/**
+	 * Create admin/staff user in admin tables
+	 * Private helper method for STAFF/ADMIN/SUPERADMIN roles
+	 */
+	private async createAdminUser(email: string, username: string, role_id: string, role: Role): Promise<UserResponseDto> {
+		// Check if admin with email already exists
+		const existingAdmin = await this.adminRepository.findOne({ where: { email } });
+		if (existingAdmin) {
+			throw new ConflictException('Admin with this email already exists');
+		}
+
+		// Check if username is already taken in admin_profiles
+		const existingAdminProfile = await this.adminProfileRepository.findOne({ where: { username } });
+		if (existingAdminProfile) {
+			throw new ConflictException('Username is already taken');
+		}
+
+		// Create admin with profile in a transaction
+		const queryRunner = this.adminRepository.manager.connection.createQueryRunner();
+		await queryRunner.connect();
+		await queryRunner.startTransaction();
+
+		try {
+			// Create admin
+			const admin = queryRunner.manager.create(Admin, {
+				email,
+				name: username, // Use username as name for now
+				role_id,
+			});
+			const savedAdmin = await queryRunner.manager.save(admin);
+
+			// Create admin profile
+			const adminProfile = queryRunner.manager.create(AdminProfile, {
+				id: savedAdmin.id, // Use same ID as admin
+				username,
+			});
+			await queryRunner.manager.save(adminProfile);
+
+			await queryRunner.commitTransaction();
+
+			// Return response in standard format
+			return {
+				id: savedAdmin.id,
+				email: savedAdmin.email,
+				username,
+				role: {
+					id: role.id,
+					name: role.name,
+				},
+				created_at: savedAdmin.created_at,
+				updated_at: savedAdmin.updated_at,
+			};
+		} catch (error) {
+			await queryRunner.rollbackTransaction();
+			throw new BadRequestException('Failed to create admin user: ' + error.message);
+		} finally {
+			await queryRunner.release();
+		}
 	}
 
 	/**
