@@ -1,7 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
 import { Report } from './report.entity';
 import { AdminProfile } from './admin-profile.entity';
-import { UserProfile } from './user-profile.entity';
 import { ReportResponse } from './report-response.entity';
 import { TaskStatus } from '../enums/user-role.enum';
 
@@ -35,17 +34,19 @@ export class Task {
 	@Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
 	updated_at: Date;
 
-	@ManyToOne(() => Report, { eager: true })
+	@ManyToOne(() => Report, (report) => report.tasks)
 	@JoinColumn({ name: 'report_id' })
 	report: Report;
 
-	@ManyToOne(() => AdminProfile, { eager: true })
+	// Admin who assigned the task (references admin_profiles)
+	@ManyToOne(() => AdminProfile)
 	@JoinColumn({ name: 'assigned_by' })
 	assignedBy: AdminProfile;
 
-	@ManyToOne(() => UserProfile, { eager: true })
+	// Staff member assigned to the task (references admin_profiles)
+	@ManyToOne(() => AdminProfile)
 	@JoinColumn({ name: 'assigned_to' })
-	assignedTo: UserProfile;
+	assignedTo: AdminProfile;
 
 	@OneToMany(() => ReportResponse, (response) => response.task, { cascade: true })
 	responses: ReportResponse[];

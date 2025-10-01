@@ -23,7 +23,7 @@ export class CreateUserDto {
 
 	@ApiProperty({
 		description: 'Role ID for the user',
-		example: '123e4567-e89b-12d3-a456-426614174000',
+		example: 'role-uuid',
 		format: 'uuid',
 	})
 	@IsUUID(4, { message: 'Role ID must be a valid UUID' })
@@ -44,7 +44,7 @@ export class UpdateUserDto {
 
 	@ApiPropertyOptional({
 		description: 'Updated role ID for the user',
-		example: '123e4567-e89b-12d3-a456-426614174001',
+		example: 'role-uuid',
 		format: 'uuid',
 	})
 	@IsOptional()
@@ -105,7 +105,7 @@ export class UserQueryDto {
 export class RoleResponseDto {
 	@ApiProperty({
 		description: 'Role ID',
-		example: '123e4567-e89b-12d3-a456-426614174000',
+		example: 'role-uuid',
 		format: 'uuid',
 	})
 	id: string;
@@ -121,7 +121,7 @@ export class RoleResponseDto {
 export class UserResponseDto {
 	@ApiProperty({
 		description: 'User ID',
-		example: '123e4567-e89b-12d3-a456-426614174000',
+		example: 'user-uuid',
 		format: 'uuid',
 	})
 	id: string;

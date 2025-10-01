@@ -40,7 +40,7 @@ export class Report {
 	@Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
 	updated_at: Date;
 
-	@ManyToOne(() => UserProfile, { eager: true })
+	@ManyToOne(() => UserProfile)
 	@JoinColumn({ name: 'user_id' })
 	user: UserProfile;
 
