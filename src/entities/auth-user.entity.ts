@@ -17,7 +17,7 @@ export class AuthUser {
 	@Column({ type: 'varchar', nullable: true })
 	supabase_id: string; // Supabase Auth user ID for syncing
 
-	@Column({ type: 'varchar' })
+	@Column({ type: 'uuid' })
 	role_id: string;
 
 	@Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })

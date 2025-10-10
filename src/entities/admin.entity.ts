@@ -13,7 +13,7 @@ export class Admin {
 	@Column({ type: 'varchar' })
 	name: string;
 
-	@Column({ type: 'varchar' })
+	@Column({ type: 'uuid' })
 	role_id: string;
 
 	@Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })

@@ -39,6 +39,36 @@ export class AddNotesDto {
 	notes: string;
 }
 
+export class AddStatusUpdateDto {
+	@ApiProperty({ description: 'Task UUID', example: 'task-uuid' })
+	@IsUUID(4, { message: 'task_id must be a valid UUID' })
+	task_id: string;
+
+	@ApiProperty({ description: 'Staff user UUID', example: 'staff-uuid' })
+	@IsUUID(4, { message: 'staff_user_id must be a valid UUID' })
+	staff_user_id: string;
+
+	@ApiProperty({ description: 'Status update text', example: 'Inspected the site, confirmed damage. Repairs in progress.' })
+	@IsString({ message: 'response_text must be a string' })
+	@Length(1, 2000, { message: 'response_text must be between 1 and 2000 characters' })
+	response_text: string;
+
+	@ApiPropertyOptional({ description: 'Optional attachment path (image)', example: '/uploads/status-updates/image.jpg' })
+	@IsOptional()
+	@IsString({ message: 'attachment_path must be a string' })
+	attachment_path?: string;
+}
+
+export class CompleteTaskDto {
+	@ApiProperty({ description: 'Task UUID', example: 'task-uuid' })
+	@IsUUID(4, { message: 'task_id must be a valid UUID' })
+	task_id: string;
+
+	@ApiProperty({ description: 'Staff user UUID', example: 'staff-uuid' })
+	@IsUUID(4, { message: 'staff_user_id must be a valid UUID' })
+	staff_user_id: string;
+}
+
 export class ResolveReportDto {
 	@ApiProperty({ description: 'Task UUID', example: 'task-uuid' })
 	@IsUUID(4, { message: 'task_id must be a valid UUID' })

@@ -1,6 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
 import { Report } from './report.entity';
 import { AdminProfile } from './admin-profile.entity';
+import { StaffProfile } from './staff-profile.entity';
 import { ReportResponse } from './report-response.entity';
 import { TaskStatus } from '../enums/user-role.enum';
 
@@ -15,7 +16,7 @@ export class Task {
 	@Column({ type: 'uuid' })
 	assigned_by: string;
 
-	@Column({ type: 'uuid' })
+	@Column({ type: 'uuid', nullable: true })
 	assigned_to: string;
 
 	@Column({ type: 'text', nullable: true })
@@ -39,14 +40,14 @@ export class Task {
 	report: Report;
 
 	// Admin who assigned the task (references admin_profiles)
-	@ManyToOne(() => AdminProfile)
+	@ManyToOne(() => AdminProfile, (adminProfile) => adminProfile.assignedTasks)
 	@JoinColumn({ name: 'assigned_by' })
 	assignedBy: AdminProfile;
 
-	// Staff member assigned to the task (references admin_profiles)
-	@ManyToOne(() => AdminProfile)
+	// Staff member assigned to the task (references staff_profiles)
+	@ManyToOne(() => StaffProfile, (staffProfile) => staffProfile.assignedTasks)
 	@JoinColumn({ name: 'assigned_to' })
-	assignedTo: AdminProfile;
+	assignedTo: StaffProfile;
 
 	@OneToMany(() => ReportResponse, (response) => response.task, { cascade: true })
 	responses: ReportResponse[];
