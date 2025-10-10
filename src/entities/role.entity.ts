@@ -1,6 +1,7 @@
 import { Entity, PrimaryColumn, Column, OneToMany } from 'typeorm';
 import { AuthUser } from './auth-user.entity';
 import { Admin } from './admin.entity';
+import { Staff } from './staff.entity';
 
 @Entity('roles')
 export class Role {
@@ -19,4 +20,7 @@ export class Role {
 
 	@OneToMany(() => Admin, (admin) => admin.role)
 	admins: Admin[];
+
+	@OneToMany(() => Staff, (staff) => staff.role)
+	staff: Staff[];
 }

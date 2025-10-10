@@ -1,7 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { Report } from './report.entity';
 import { Task } from './task.entity';
-import { UserProfile } from './user-profile.entity';
+import { StaffProfile } from './staff-profile.entity';
 
 @Entity('report_responses')
 export class ReportResponse {
@@ -14,24 +14,28 @@ export class ReportResponse {
 	@Column({ type: 'uuid' })
 	task_id: string;
 
-	@Column({ type: 'uuid' })
+	@Column({ type: 'uuid', nullable: true })
 	responded_by: string;
 
 	@Column({ type: 'text' })
 	response_text: string;
 
+	@Column({ type: 'varchar', nullable: true })
+	attachment_path?: string;
+
 	@Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
 	responded_at: Date;
 
-	@ManyToOne(() => Report, { eager: true })
+	@ManyToOne(() => Report, (report) => report.responses)
 	@JoinColumn({ name: 'report_id' })
 	report: Report;
 
-	@ManyToOne(() => Task, { eager: true })
+	@ManyToOne(() => Task, (task) => task.responses)
 	@JoinColumn({ name: 'task_id' })
 	task: Task;
 
-	@ManyToOne(() => UserProfile, { eager: true })
+	// Staff member who responded (references staff_profiles)
+	@ManyToOne(() => StaffProfile, (staffProfile) => staffProfile.responses)
 	@JoinColumn({ name: 'responded_by' })
-	respondedBy: UserProfile;
+	respondedBy: StaffProfile;
 }

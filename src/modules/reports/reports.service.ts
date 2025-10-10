@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Report } from '../../entities/report.entity';
 import { SosReport } from '../../entities/sos-report.entity';
 import { Task } from '../../entities/task.entity';
+import { ReportResponse } from '../../entities/report-response.entity';
 import { ReportStatus, TaskStatus } from '../../enums/user-role.enum';
 import { CreateReportDto, CreateSosReportDto, ListReportsQueryDto } from '../../dto/reports.dto';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -29,6 +30,8 @@ export class ReportsService {
 		private sosReportRepository: Repository<SosReport>,
 		@InjectRepository(Task)
 		private taskRepository: Repository<Task>,
+		@InjectRepository(ReportResponse)
+		private reportResponseRepository: Repository<ReportResponse>,
 		private readonly notificationsService: NotificationsService,
 	) {}
 
@@ -184,31 +187,9 @@ export class ReportsService {
 	}
 
 	/**
-	 * Add investigation notes to a report (for Staff role)
+	 * Add status update with notes and optional image to a report (for Staff role)
 	 */
-	async addNotes(reportId: string, taskId: string, userId: string, notes: string): Promise<any> {
-		const task = await this.taskRepository.findOne({
-			where: { id: taskId, report_id: reportId },
-		});
-
-		if (!task) {
-			throw new Error(`Task with ID ${taskId} for report ${reportId} not found`);
-		}
-
-		// Update task details with notes
-		const updatedDetails = task.task_details ? `${task.task_details}\n\nNotes: ${notes}` : `Notes: ${notes}`;
-		await this.taskRepository.update(taskId, {
-			task_details: updatedDetails,
-			status: task.status === TaskStatus.NOT_RECEIVED ? TaskStatus.IN_PROGRESS : task.status,
-		});
-
-		return this.taskRepository.findOne({ where: { id: taskId } });
-	}
-
-	/**
-	 * Resolve a report (for Staff role)
-	 */
-	async resolveReport(reportId: string, taskId: string, staffUserId: string): Promise<Report> {
+	async addStatusUpdate(reportId: string, taskId: string, staffUserId: string, responseText: string, attachmentPath?: string): Promise<ReportResponse> {
 		const task = await this.taskRepository.findOne({
 			where: { id: taskId, report_id: reportId, assigned_to: staffUserId },
 		});
@@ -217,17 +198,51 @@ export class ReportsService {
 			throw new Error(`Task with ID ${taskId} not found or not assigned to this user`);
 		}
 
-		// Mark task as completed
+		// Create response entry
+		const response = this.reportResponseRepository.create({
+			report_id: reportId,
+			task_id: taskId,
+			responded_by: staffUserId,
+			response_text: responseText,
+			attachment_path: attachmentPath,
+		});
+
+		const savedResponse = await this.reportResponseRepository.save(response);
+
+		// Update task status to IN_PROGRESS if not already
+		if (task.status === TaskStatus.NOT_RECEIVED) {
+			await this.taskRepository.update(taskId, { status: TaskStatus.IN_PROGRESS });
+		}
+
+		return savedResponse;
+	}
+
+	/**
+	 * Mark task as completed (for Staff role)
+	 * Note: Only Admin can mark the report as RESOLVED via updateReportStatus
+	 */
+	async completeTask(reportId: string, taskId: string, staffUserId: string): Promise<Task> {
+		const task = await this.taskRepository.findOne({
+			where: { id: taskId, report_id: reportId, assigned_to: staffUserId },
+		});
+
+		if (!task) {
+			throw new Error(`Task with ID ${taskId} not found or not assigned to this user`);
+		}
+
+		// Mark task as completed (does NOT resolve the report - Admin does that)
 		await this.taskRepository.update(taskId, { status: TaskStatus.COMPLETED });
 
-		// Update report status to RESOLVED
-		await this.reportRepository.update(reportId, { status: ReportStatus.RESOLVED });
+		const completedTask = await this.taskRepository.findOne({
+			where: { id: taskId },
+			relations: ['report', 'assignedBy', 'assignedTo'],
+		});
 
-		const resolvedReport = await this.findById(reportId);
-		if (!resolvedReport) {
-			throw new Error(`Report with ID ${reportId} not found after resolution`);
+		if (!completedTask) {
+			throw new Error(`Task with ID ${taskId} not found after update`);
 		}
-		return resolvedReport;
+
+		return completedTask;
 	}
 
 	/**

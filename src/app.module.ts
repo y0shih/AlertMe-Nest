@@ -9,6 +9,8 @@ import { AuthUser } from './entities/auth-user.entity';
 import { UserProfile } from './entities/user-profile.entity';
 import { Admin } from './entities/admin.entity';
 import { AdminProfile } from './entities/admin-profile.entity';
+import { Staff } from './entities/staff.entity';
+import { StaffProfile } from './entities/staff-profile.entity';
 import { Report } from './entities/report.entity';
 import { Task } from './entities/task.entity';
 import { ReportResponse } from './entities/report-response.entity';
@@ -16,6 +18,7 @@ import { SosReport } from './entities/sos-report.entity';
 import { AuthModule } from './modules/auth/auth.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { UsersModule } from './modules/users/users.module';
+import { StaffModule } from './modules/staff/staff.module';
 
 @Module({
 	imports: [
@@ -29,15 +32,16 @@ import { UsersModule } from './modules/users/users.module';
 				const dbConfig = configService.get('database');
 				return {
 					...dbConfig,
-					entities: [Role, AuthUser, UserProfile, Admin, AdminProfile, Report, Task, ReportResponse, SosReport],
+					entities: [Role, AuthUser, UserProfile, Admin, AdminProfile, Staff, StaffProfile, Report, Task, ReportResponse, SosReport],
 				};
 			},
 			inject: [ConfigService],
 		}),
-		TypeOrmModule.forFeature([Role, AuthUser, UserProfile, Admin, AdminProfile, Report, Task, ReportResponse, SosReport]),
+		TypeOrmModule.forFeature([Role, AuthUser, UserProfile, Admin, AdminProfile, Staff, StaffProfile, Report, Task, ReportResponse, SosReport]),
 		AuthModule,
 		ReportsModule,
 		UsersModule,
+		StaffModule,
 	],
 	controllers: [AppController],
 	providers: [AppService],
