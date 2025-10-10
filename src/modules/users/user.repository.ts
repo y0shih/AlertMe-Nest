@@ -40,7 +40,7 @@ export class AuthUserRepository extends Repository<AuthUser> {
 		// Apply role filter if provided
 		// Requirement 2.2: WHEN an admin filters users by role THEN the system SHALL return users with the specified role
 		if (role) {
-			queryBuilder.andWhere('LOWER(role.name) = LOWER(:role)', { role });
+			queryBuilder.andWhere('LOWER(role.name::text) = LOWER(:role)', { role });
 		}
 
 		// Get total count for pagination
@@ -80,7 +80,7 @@ export class AuthUserRepository extends Repository<AuthUser> {
 
 		// Filter by role
 		if (criteria.role) {
-			queryBuilder.andWhere('LOWER(role.name) = LOWER(:role)', { role: criteria.role });
+			queryBuilder.andWhere('LOWER(role.name::text) = LOWER(:role)', { role: criteria.role });
 			hasConditions = true;
 		}
 

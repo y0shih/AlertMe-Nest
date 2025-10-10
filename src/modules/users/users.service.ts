@@ -5,6 +5,8 @@ import { AuthUser } from '../../entities/auth-user.entity';
 import { UserProfile } from '../../entities/user-profile.entity';
 import { Admin } from '../../entities/admin.entity';
 import { AdminProfile } from '../../entities/admin-profile.entity';
+import { Staff } from '../../entities/staff.entity';
+import { StaffProfile } from '../../entities/staff-profile.entity';
 import { Role } from '../../entities/role.entity';
 import { AuthUserRepository } from './user.repository';
 import { CreateUserDto, UpdateUserDto, UserQueryDto, UserResponseDto, PaginatedUserResponse, UserSearchDto } from '../../dto/user.dto';
@@ -19,6 +21,10 @@ export class UsersService {
 		private readonly adminRepository: Repository<Admin>,
 		@InjectRepository(AdminProfile)
 		private readonly adminProfileRepository: Repository<AdminProfile>,
+		@InjectRepository(Staff)
+		private readonly staffRepository: Repository<Staff>,
+		@InjectRepository(StaffProfile)
+		private readonly staffProfileRepository: Repository<StaffProfile>,
 		@InjectRepository(Role)
 		private readonly roleRepository: Repository<Role>,
 	) {}
@@ -83,8 +89,13 @@ export class UsersService {
 			throw new BadRequestException('Invalid role ID provided');
 		}
 
-		// Route to admin tables for staff/admin/superadmin
-		if (role.name === 'staff' || role.name === 'admin' || role.name === 'superadmin') {
+		// Route to staff tables for STAFF role
+		if (role.name === 'staff') {
+			return this.createStaffUser(email, username, role_id, role);
+		}
+
+		// Route to admin tables for admin/superadmin
+		if (role.name === 'admin' || role.name === 'superadmin') {
 			return this.createAdminUser(email, username, role_id, role);
 		}
 
@@ -263,8 +274,68 @@ export class UsersService {
 	}
 
 	/**
-	 * Create admin/staff user in admin tables
-	 * Private helper method for STAFF/ADMIN/SUPERADMIN roles
+	 * Create staff user in staff tables
+	 * Private helper method for STAFF role
+	 */
+	private async createStaffUser(email: string, username: string, role_id: string, role: Role): Promise<UserResponseDto> {
+		// Check if staff with email already exists
+		const existingStaff = await this.staffRepository.findOne({ where: { email } });
+		if (existingStaff) {
+			throw new ConflictException('Staff with this email already exists');
+		}
+
+		// Check if username is already taken in staff_profiles
+		const existingStaffProfile = await this.staffProfileRepository.findOne({ where: { username } });
+		if (existingStaffProfile) {
+			throw new ConflictException('Username is already taken');
+		}
+
+		// Create staff with profile in a transaction
+		const queryRunner = this.staffRepository.manager.connection.createQueryRunner();
+		await queryRunner.connect();
+		await queryRunner.startTransaction();
+
+		try {
+			// Create staff
+			const staff = queryRunner.manager.create(Staff, {
+				email,
+				name: username, // Use username as name for now
+				role_id,
+			});
+			const savedStaff = await queryRunner.manager.save(staff);
+
+			// Create staff profile
+			const staffProfile = queryRunner.manager.create(StaffProfile, {
+				id: savedStaff.id, // Use same ID as staff
+				username,
+			});
+			await queryRunner.manager.save(staffProfile);
+
+			await queryRunner.commitTransaction();
+
+			// Return response in standard format
+			return {
+				id: savedStaff.id,
+				email: savedStaff.email,
+				username,
+				role: {
+					id: role.id,
+					name: role.name,
+				},
+				created_at: savedStaff.created_at,
+				updated_at: savedStaff.updated_at,
+			};
+		} catch (error) {
+			await queryRunner.rollbackTransaction();
+			throw new BadRequestException('Failed to create staff user: ' + error.message);
+		} finally {
+			await queryRunner.release();
+		}
+	}
+
+	/**
+	 * Create admin user in admin tables
+	 * Private helper method for ADMIN/SUPERADMIN roles
 	 */
 	private async createAdminUser(email: string, username: string, role_id: string, role: Role): Promise<UserResponseDto> {
 		// Check if admin with email already exists
