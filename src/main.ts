@@ -88,6 +88,28 @@ async function bootstrap() {
 	return expressApp;
 }
 
+// If this file is executed directly (local development), bootstrap and listen.
+// When deployed on Vercel the module will be imported and `require.main !== module`,
+// so this block won't run and the exported handler will be used instead.
+if (typeof require !== 'undefined' && require.main === module) {
+	// Start the app and listen when executed directly (local dev).
+	void (async () => {
+		try {
+			const expressApp = await bootstrap();
+			const port = process.env.PORT ? Number(process.env.PORT) : 3000;
+			const host = process.env.HOST || 'localhost';
+			expressApp.listen(port, () => {
+				console.log(`Local Nest server listening at http://${host}:${port}/`);
+				console.log(`Swagger UI: http://${host}:${port}/docs`);
+				console.log(`OpenAPI JSON: http://${host}:${port}/docs-json`);
+			});
+		} catch (err) {
+			console.error('Failed to start local server', err);
+			process.exit(1);
+		}
+	})();
+}
+
 // Export an Express-compatible handler for Vercel.
 export default async function handler(req, res) {
 	try {
