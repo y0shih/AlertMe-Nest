@@ -2,7 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
-import serverlessExpress from '@vendia/serverless-express';
+import { createServer, proxy } from '@vendia/serverless-express';
 
 let server: any;
 
@@ -58,10 +58,13 @@ async function bootstrap() {
 
 	await app.init();
 	const expressApp = app.getHttpAdapter().getInstance();
-	return serverlessExpress({ app: expressApp });
+	// create a Node http server that can be proxied by the lambda handler
+	return createServer(expressApp);
 }
 
 export const handler = async (event, context) => {
 	server = server ?? (await bootstrap());
-	return server(event, context);
+	// Use the proxy in PROMISE mode and return its promise which resolves to the lambda response
+	const result = proxy(server, event, context, 'PROMISE');
+	return result.promise;
 };
