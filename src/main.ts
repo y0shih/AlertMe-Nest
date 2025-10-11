@@ -42,7 +42,8 @@ async function bootstrap() {
 		.build();
 
 	const document = SwaggerModule.createDocument(app, config);
-	SwaggerModule.setup('api', app, document, {
+	// Mount Swagger UI at /docs to avoid conflict with Vercel's reserved /api namespace
+	SwaggerModule.setup('docs', app, document, {
 		swaggerOptions: {
 			persistAuthorization: true,
 			tagsSorter: 'alpha',
@@ -54,6 +55,12 @@ async function bootstrap() {
 		customSiteTitle: 'AlertMe API',
 		customfavIcon: '/favicon.ico',
 		customCss: '.swagger-ui .topbar { display: none }',
+	});
+
+	// Also expose the raw OpenAPI JSON at /docs-json for tooling and diagnostics
+	app.use('/docs-json', (req, res) => {
+		res.setHeader('Content-Type', 'application/json');
+		res.send(document);
 	});
 
 	await app.init();
