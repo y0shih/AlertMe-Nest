@@ -2,7 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
-import { createServer, proxy } from '@vendia/serverless-express';
+// For Vercel we export an Express-compatible handler (req, res).
 
 let server: any;
 
@@ -51,20 +51,38 @@ async function bootstrap() {
 			filter: true,
 			showRequestDuration: true,
 		},
-		customSiteTitle: 'ERP System API Documentation',
+		customSiteTitle: 'AlertMe API',
 		customfavIcon: '/favicon.ico',
 		customCss: '.swagger-ui .topbar { display: none }',
 	});
 
 	await app.init();
 	const expressApp = app.getHttpAdapter().getInstance();
-	// create a Node http server that can be proxied by the lambda handler
-	return createServer(expressApp);
+	// Return the express application instance which is callable as (req, res)
+	return expressApp;
 }
 
-export const handler = async (event, context) => {
-	server = server ?? (await bootstrap());
-	// Use the proxy in PROMISE mode and return its promise which resolves to the lambda response
-	const result = proxy(server, event, context, 'PROMISE');
-	return result.promise;
-};
+// Export an Express-compatible handler for Vercel.
+export default async function handler(req, res) {
+	try {
+		// Initialize once and reuse the express app
+		const expressApp = server ?? (await bootstrap());
+		server = expressApp;
+		return expressApp(req, res);
+	} catch (err) {
+		// If initialization fails, return 500
+		console.error('Failed to initialize server', err);
+		res.statusCode = 500;
+		res.end('Internal Server Error');
+	}
+}
+
+// Also ensure CommonJS consumers receive the function directly on module.exports.
+// Vercel's runtime may load the transpiled CommonJS file and expect module.exports to be
+// a function or server instance. Assigning here guarantees compatibility where possible.
+try {
+	// Cast via `unknown` to avoid using `any` so linting rules are satisfied.
+	(module as unknown as { exports?: unknown }).exports = handler;
+} catch (_e) {
+	// ignore in environments where `module` is not writable
+}
