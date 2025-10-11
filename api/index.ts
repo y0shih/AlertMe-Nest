@@ -1,3 +1,3 @@
-import { handler } from '../dist/src/main';
+import { handler } from '../src/main';
 
 export default handler;
