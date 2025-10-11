@@ -25,8 +25,8 @@ async function bootstrap() {
 
 	// Swagger configuration
 	const config = new DocumentBuilder()
-		.setTitle('hello')
-		.setDescription('alo alo')
+		.setTitle('AlertMe API')
+		.setDescription('API documentation for AlertMe')
 		.setVersion('1.0')
 		.addBearerAuth(
 			{
@@ -54,7 +54,7 @@ async function bootstrap() {
 			filter: true,
 			showRequestDuration: true,
 		},
-		customSiteTitle: 'ERP System API Documentation',
+		customSiteTitle: 'AlertMe API Documentation',
 		customfavIcon: '/favicon.ico',
 		customCss: '.swagger-ui .topbar { display: none }',
 	});
