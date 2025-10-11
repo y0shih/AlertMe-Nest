@@ -1,10 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException, UnauthorizedException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient, Provider } from '@supabase/supabase-js';
 import { AuthUser } from '../../entities/auth-user.entity';
 import { Role } from '../../entities/role.entity';
+import { UserProfile } from '../../entities/user-profile.entity';
 
 @Injectable()
 export class AuthService {
@@ -15,6 +16,8 @@ export class AuthService {
 		private authUserRepository: Repository<AuthUser>,
 		@InjectRepository(Role)
 		private roleRepository: Repository<Role>,
+		@InjectRepository(UserProfile)
+		private userProfileRepository: Repository<UserProfile>,
 		private configService: ConfigService,
 	) {
 		// Initialize Supabase client
@@ -23,34 +26,45 @@ export class AuthService {
 		this.supabase = createClient(supabaseUrl, supabaseAnonKey);
 	}
 
-	async signUp(email: string, password: string, username: string) {
+	async signUp(email: string, password: string, username: string, phone_number?: string) {
 		try {
+			// Check if user already exists
+			const existingUser = await this.authUserRepository.findOne({ where: { email } });
+			if (existingUser) {
+				throw new ConflictException('User with this email already exists');
+			}
+
 			const { data, error } = await this.supabase.auth.signUp({
 				email,
 				password,
 				options: {
 					data: {
 						username,
+						phone_number,
 					},
 				},
 			});
 
 			if (error) {
-				throw new Error(error.message);
+				throw new BadRequestException(error.message);
 			}
 
 			// Sync with our database if user was created
 			if (data.user) {
-				await this.syncSupabaseUser(data.user);
+				await this.syncSupabaseUser(data.user, { username, phone_number });
 				return {
 					message: 'Registration successful! Please check your email for verification.',
 					user: data.user,
+					requiresEmailVerification: true,
 				};
 			}
 
-			throw new Error('Registration failed');
+			throw new BadRequestException('Registration failed');
 		} catch (error) {
-			throw new Error(error.message);
+			if (error instanceof ConflictException || error instanceof BadRequestException) {
+				throw error;
+			}
+			throw new BadRequestException(error instanceof Error ? error.message : 'Registration failed');
 		}
 	}
 
@@ -62,7 +76,7 @@ export class AuthService {
 			});
 
 			if (error) {
-				throw new Error('Invalid credentials');
+				throw new UnauthorizedException('Invalid credentials');
 			}
 
 			if (data.user && data.session) {
@@ -79,24 +93,32 @@ export class AuthService {
 					access_token: data.session.access_token,
 					refresh_token: data.session.refresh_token,
 					user: user,
+					expires_in: data.session.expires_in,
+					expires_at: data.session.expires_at,
 				};
 			}
 
-			throw new Error('Login failed');
+			throw new UnauthorizedException('Login failed');
 		} catch (error) {
-			throw new Error(error.message);
+			if (error instanceof UnauthorizedException) {
+				throw error;
+			}
+			throw new UnauthorizedException(error instanceof Error ? error.message : 'Login failed');
 		}
 	}
 
-	async signOut(accessToken: string) {
+	async signOut(_accessToken: string) {
 		try {
 			const { error } = await this.supabase.auth.signOut();
 			if (error) {
-				throw new Error(error.message);
+				throw new BadRequestException(error.message);
 			}
 			return { message: 'Sign out successful' };
 		} catch (error) {
-			throw new Error(error.message);
+			if (error instanceof BadRequestException) {
+				throw error;
+			}
+			throw new BadRequestException(error instanceof Error ? error.message : 'Sign out failed');
 		}
 	}
 
@@ -107,15 +129,20 @@ export class AuthService {
 			});
 
 			if (error) {
-				throw new Error(error.message);
+				throw new UnauthorizedException(error.message);
 			}
 
 			return {
 				access_token: data.session?.access_token,
 				refresh_token: data.session?.refresh_token,
+				expires_in: data.session?.expires_in,
+				expires_at: data.session?.expires_at,
 			};
 		} catch (error) {
-			throw new Error(error.message);
+			if (error instanceof UnauthorizedException) {
+				throw error;
+			}
+			throw new UnauthorizedException(error instanceof Error ? error.message : 'Token refresh failed');
 		}
 	}
 
@@ -127,7 +154,7 @@ export class AuthService {
 			} = await this.supabase.auth.getUser(accessToken);
 
 			if (error) {
-				throw new Error(error.message);
+				throw new UnauthorizedException(error.message);
 			}
 
 			if (user) {
@@ -143,7 +170,10 @@ export class AuthService {
 
 			return null;
 		} catch (error) {
-			throw new Error(error.message);
+			if (error instanceof UnauthorizedException) {
+				throw error;
+			}
+			throw new UnauthorizedException(error instanceof Error ? error.message : 'Failed to get user');
 		}
 	}
 
@@ -151,7 +181,7 @@ export class AuthService {
 	 * Sync Supabase Auth user with our database
 	 * This ensures our user tables stay in sync with Supabase Auth
 	 */
-	private async syncSupabaseUser(supabaseUser: any) {
+	private async syncSupabaseUser(supabaseUser: any, additionalData?: { username?: string; phone_number?: string }) {
 		try {
 			// Check if user exists in our database
 			let user = await this.authUserRepository.findOne({
@@ -162,32 +192,55 @@ export class AuthService {
 			// Get default user role
 			const userRole = await this.roleRepository.findOne({ where: { name: 'user' } });
 			if (!userRole) {
-				throw new Error('Default user role not found');
+				throw new BadRequestException('Default user role not found');
 			}
 
 			if (!user) {
 				// Create user in our database
 				user = this.authUserRepository.create({
 					email: supabaseUser.email,
+					supabase_id: supabaseUser.id,
 					role_id: userRole.id,
-					profile: {
-						username: supabaseUser.user_metadata?.username || supabaseUser.email.split('@')[0],
-					},
 				});
 
 				await this.authUserRepository.save(user);
-			} else {
-				// Update user profile if needed
-				if (supabaseUser.user_metadata?.username && !user.profile) {
-					user.profile = {
-						id: user.id,
-						username: supabaseUser.user_metadata.username,
-						created_at: user.created_at,
-						updated_at: user.updated_at,
-						authUser: user,
-					} as any;
 
+				// Create user profile
+				const username =
+					additionalData?.username || supabaseUser.user_metadata?.username || supabaseUser.user_metadata?.full_name || supabaseUser.email.split('@')[0];
+
+				const profile = this.userProfileRepository.create({
+					id: user.id,
+					username,
+					phone_number: additionalData?.phone_number || supabaseUser.user_metadata?.phone_number,
+					profilepic: supabaseUser.user_metadata?.avatar_url,
+				});
+
+				await this.userProfileRepository.save(profile);
+			} else {
+				// Update supabase_id if not set
+				if (!user.supabase_id && supabaseUser.id) {
+					user.supabase_id = supabaseUser.id;
 					await this.authUserRepository.save(user);
+				}
+
+				// Update user profile if needed
+				if (!user.profile) {
+					const username =
+						additionalData?.username || supabaseUser.user_metadata?.username || supabaseUser.user_metadata?.full_name || supabaseUser.email.split('@')[0];
+
+					const profile = this.userProfileRepository.create({
+						id: user.id,
+						username,
+						phone_number: additionalData?.phone_number || supabaseUser.user_metadata?.phone_number,
+						profilepic: supabaseUser.user_metadata?.avatar_url,
+					});
+
+					await this.userProfileRepository.save(profile);
+				} else if (supabaseUser.user_metadata?.avatar_url && !user.profile.profilepic) {
+					// Update profile picture from OAuth provider
+					user.profile.profilepic = supabaseUser.user_metadata.avatar_url;
+					await this.userProfileRepository.save(user.profile);
 				}
 			}
 
@@ -203,9 +256,6 @@ export class AuthService {
 	 */
 	async getUserFromToken(token: string): Promise<AuthUser | null> {
 		try {
-			const payload = JSON.parse(atob(token.split('.')[1]));
-			const supabaseUserId = payload.sub;
-
 			const {
 				data: { user },
 				error,
@@ -219,8 +269,194 @@ export class AuthService {
 				where: { email: user.email },
 				relations: ['role', 'profile'],
 			});
-		} catch (error) {
+		} catch (_error) {
 			return null;
+		}
+	}
+
+	/**
+	 * Initiate OAuth sign-in with a provider
+	 */
+	async signInWithOAuth(provider: Provider, redirectTo?: string) {
+		try {
+			const { data, error } = await this.supabase.auth.signInWithOAuth({
+				provider,
+				options: {
+					redirectTo: redirectTo || `${this.configService.get<string>('APP_URL')}/auth/callback`,
+				},
+			});
+
+			if (error) {
+				throw new BadRequestException(error.message);
+			}
+
+			return {
+				url: data.url,
+				provider: data.provider,
+			};
+		} catch (error) {
+			if (error instanceof BadRequestException) {
+				throw error;
+			}
+			throw new BadRequestException(error instanceof Error ? error.message : 'OAuth sign-in failed');
+		}
+	}
+
+	/**
+	 * Handle OAuth callback
+	 */
+	async handleOAuthCallback(code: string) {
+		try {
+			const { data, error } = await this.supabase.auth.exchangeCodeForSession(code);
+
+			if (error) {
+				throw new BadRequestException(error.message);
+			}
+
+			if (data.user && data.session) {
+				// Sync OAuth user with our database
+				await this.syncSupabaseUser(data.user);
+
+				// Get user from our database
+				const user = await this.authUserRepository.findOne({
+					where: { email: data.user.email },
+					relations: ['role', 'profile'],
+				});
+
+				return {
+					access_token: data.session.access_token,
+					refresh_token: data.session.refresh_token,
+					user: user,
+					expires_in: data.session.expires_in,
+					expires_at: data.session.expires_at,
+				};
+			}
+
+			throw new BadRequestException('OAuth callback failed');
+		} catch (error) {
+			if (error instanceof BadRequestException) {
+				throw error;
+			}
+			throw new BadRequestException(error instanceof Error ? error.message : 'OAuth callback failed');
+		}
+	}
+
+	/**
+	 * Request password reset email
+	 */
+	async requestPasswordReset(email: string) {
+		try {
+			const { error } = await this.supabase.auth.resetPasswordForEmail(email, {
+				redirectTo: `${this.configService.get<string>('APP_URL')}/auth/reset-password`,
+			});
+
+			if (error) {
+				throw new BadRequestException(error.message);
+			}
+
+			return {
+				message: 'Password reset email sent. Please check your inbox.',
+			};
+		} catch (error) {
+			if (error instanceof BadRequestException) {
+				throw error;
+			}
+			throw new BadRequestException(error instanceof Error ? error.message : 'Password reset request failed');
+		}
+	}
+
+	/**
+	 * Update password with reset token
+	 */
+	async resetPassword(accessToken: string, newPassword: string) {
+		try {
+			// Set the session using the access token from email link
+			const { error: sessionError } = await this.supabase.auth.setSession({
+				access_token: accessToken,
+				refresh_token: accessToken, // In password reset flow, the token works for both
+			});
+
+			if (sessionError) {
+				throw new UnauthorizedException('Invalid or expired reset token');
+			}
+
+			// Update the password
+			const { error } = await this.supabase.auth.updateUser({
+				password: newPassword,
+			});
+
+			if (error) {
+				throw new BadRequestException(error.message);
+			}
+
+			return {
+				message: 'Password successfully reset',
+			};
+		} catch (error) {
+			if (error instanceof UnauthorizedException || error instanceof BadRequestException) {
+				throw error;
+			}
+			throw new BadRequestException(error instanceof Error ? error.message : 'Password reset failed');
+		}
+	}
+
+	/**
+	 * Update password for authenticated user
+	 */
+	async updatePassword(currentPassword: string, newPassword: string, email: string) {
+		try {
+			// Verify current password
+			const { error: signInError } = await this.supabase.auth.signInWithPassword({
+				email,
+				password: currentPassword,
+			});
+
+			if (signInError) {
+				throw new UnauthorizedException('Current password is incorrect');
+			}
+
+			// Update to new password
+			const { error } = await this.supabase.auth.updateUser({
+				password: newPassword,
+			});
+
+			if (error) {
+				throw new BadRequestException(error.message);
+			}
+
+			return {
+				message: 'Password successfully updated',
+			};
+		} catch (error) {
+			if (error instanceof UnauthorizedException || error instanceof BadRequestException) {
+				throw error;
+			}
+			throw new BadRequestException(error instanceof Error ? error.message : 'Password update failed');
+		}
+	}
+
+	/**
+	 * Resend verification email
+	 */
+	async resendVerificationEmail(email: string) {
+		try {
+			const { error } = await this.supabase.auth.resend({
+				type: 'signup',
+				email,
+			});
+
+			if (error) {
+				throw new BadRequestException(error.message);
+			}
+
+			return {
+				message: 'Verification email sent. Please check your inbox.',
+			};
+		} catch (error) {
+			if (error instanceof BadRequestException) {
+				throw error;
+			}
+			throw new BadRequestException(error instanceof Error ? error.message : 'Failed to resend verification email');
 		}
 	}
 }

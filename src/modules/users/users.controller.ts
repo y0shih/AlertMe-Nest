@@ -1,10 +1,14 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, HttpStatus, HttpCode, ParseUUIDPipe, ValidationPipe } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBody } from '@nestjs/swagger';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, HttpStatus, HttpCode, ParseUUIDPipe, ValidationPipe, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { CreateUserDto, UpdateUserDto, UserQueryDto, UserResponseDto, PaginatedUserResponse } from '../../dto/user.dto';
+import { SupabaseAuthGuard } from '../auth/supabase-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 
 @ApiTags('Users')
-// @ApiBearerAuth() // Temporarily disabled for development - FIXME: Re-enable when auth is working
+@ApiBearerAuth('JWT-auth')
+@UseGuards(SupabaseAuthGuard, RolesGuard)
 @Controller('users')
 export class UsersController {
 	constructor(private readonly usersService: UsersService) {}
@@ -59,6 +63,7 @@ export class UsersController {
 		},
 	})
 	@Get()
+	@Roles('admin', 'superadmin')
 	async findAll(@Query(new ValidationPipe({ transform: true, whitelist: true })) query: UserQueryDto): Promise<PaginatedUserResponse> {
 		return this.usersService.findAll(query);
 	}
@@ -104,6 +109,7 @@ export class UsersController {
 		},
 	})
 	@Get(':id')
+	@Roles('admin', 'superadmin')
 	async findById(@Param('id', ParseUUIDPipe) id: string): Promise<UserResponseDto> {
 		return this.usersService.findById(id);
 	}
@@ -172,6 +178,7 @@ export class UsersController {
 	})
 	@Post()
 	@HttpCode(HttpStatus.CREATED)
+	@Roles('admin', 'superadmin')
 	async create(@Body(ValidationPipe) createUserDto: CreateUserDto): Promise<UserResponseDto> {
 		return this.usersService.createUser(createUserDto);
 	}
@@ -262,6 +269,7 @@ export class UsersController {
 		},
 	})
 	@Put(':id')
+	@Roles('admin', 'superadmin')
 	async update(@Param('id', ParseUUIDPipe) id: string, @Body(ValidationPipe) updateUserDto: UpdateUserDto): Promise<UserResponseDto> {
 		return this.usersService.updateUser(id, updateUserDto);
 	}
@@ -307,6 +315,7 @@ export class UsersController {
 	})
 	@Delete(':id')
 	@HttpCode(HttpStatus.NO_CONTENT)
+	@Roles('admin', 'superadmin')
 	async delete(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
 		return this.usersService.deleteUser(id);
 	}
@@ -331,6 +340,7 @@ export class UsersController {
 		},
 	})
 	@Get('dev/roles')
+	@Roles('admin', 'superadmin')
 	async getRoles() {
 		return this.usersService.getAllRoles();
 	}

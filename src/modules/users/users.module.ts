@@ -11,11 +11,12 @@ import { StaffProfile } from '../../entities/staff-profile.entity';
 import { Role } from '../../entities/role.entity';
 import { AuthUserRepository } from './user.repository';
 import { RoleRepository } from '../../repositories/role.repository';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-	imports: [TypeOrmModule.forFeature([AuthUser, UserProfile, Admin, AdminProfile, Staff, StaffProfile, Role])],
+	imports: [TypeOrmModule.forFeature([AuthUser, UserProfile, Admin, AdminProfile, Staff, StaffProfile, Role]), AuthModule],
 	controllers: [UsersController],
 	providers: [UsersService, AuthUserRepository, RoleRepository],
 	exports: [UsersService], // Export for potential use by other modules
 })
-export class UsersModule {}
+export class UsersModule { }
