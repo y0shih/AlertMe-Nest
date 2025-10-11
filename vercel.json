@@ -1,8 +1,6 @@
 {
     "functions": {
-        "api/index.ts": {
-            "runtime": "@vercel/node@3"
-        }
+        "api/index.ts": {}
     },
     "routes": [
         {
