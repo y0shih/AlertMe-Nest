@@ -42,29 +42,48 @@ async function bootstrap() {
 		.build();
 
 	const document = SwaggerModule.createDocument(app, config);
-	// Mount Swagger UI at /docs to avoid conflict with Vercel's reserved /api namespace
-	SwaggerModule.setup('docs', app, document, {
-		swaggerOptions: {
-			persistAuthorization: true,
-			tagsSorter: 'alpha',
-			operationsSorter: 'alpha',
-			tryItOutEnabled: true,
-			filter: true,
-			showRequestDuration: true,
-		},
-		customSiteTitle: 'AlertMe API',
-		customfavIcon: '/favicon.ico',
-		customCss: '.swagger-ui .topbar { display: none }',
-	});
 
-	// Also expose the raw OpenAPI JSON at /docs-json for tooling and diagnostics
-	app.use('/docs-json', (req, res) => {
+	// Get the underlying Express instance so we can mount static routes directly.
+	const expressApp = app.getHttpAdapter().getInstance();
+
+	// Expose the raw OpenAPI JSON at /docs-json for tooling and diagnostics
+	expressApp.use('/docs-json', (req, res) => {
 		res.setHeader('Content-Type', 'application/json');
 		res.send(document);
 	});
 
+	// Serve a lightweight Swagger UI HTML page at /docs that loads swagger-ui from a CDN
+	// This avoids issues with swagger-ui-express + Express 5 compatibility in serverless envs.
+	expressApp.get('/docs', (req, res) => {
+		res.setHeader('Content-Type', 'text/html');
+		res.send(`<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>API Docs</title>
+		<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@4/swagger-ui.css" />
+	</head>
+	<body>
+		<div id="swagger-ui"></div>
+		<script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@4/swagger-ui-bundle.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@4/swagger-ui-standalone-preset.js"></script>
+		<script>
+			window.onload = function() {
+				const ui = SwaggerUIBundle({
+					url: '/docs-json',
+					dom_id: '#swagger-ui',
+					presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+					layout: 'StandaloneLayout',
+				});
+				window.ui = ui;
+			};
+		</script>
+	</body>
+</html>`);
+	});
+
 	await app.init();
-	const expressApp = app.getHttpAdapter().getInstance();
 	// Return the express application instance which is callable as (req, res)
 	return expressApp;
 }
