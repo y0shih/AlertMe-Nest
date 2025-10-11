@@ -2,19 +2,20 @@ import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
+import serverlessExpress from '@vendia/serverless-express';
+
+let server: any;
 
 async function bootstrap() {
 	const app = await NestFactory.create(AppModule);
 
-	// Enable CORS for Swagger and API access
 	app.enableCors({
-		origin: true, // Allow all origins in development
+		origin: true,
 		methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
 		allowedHeaders: 'Content-Type, Accept, Authorization, X-Requested-With',
 		credentials: true,
 	});
 
-	// Global validation pipe for DTO validation
 	app.useGlobalPipes(
 		new ValidationPipe({
 			whitelist: true,
@@ -23,7 +24,6 @@ async function bootstrap() {
 		}),
 	);
 
-	// Swagger configuration
 	const config = new DocumentBuilder()
 		.setTitle('hello')
 		.setDescription('alo alo')
@@ -41,9 +41,6 @@ async function bootstrap() {
 		)
 		.build();
 
-	// Get the actual port the app will run on
-	const port = process.env.PORT ?? 3000;
-
 	const document = SwaggerModule.createDocument(app, config);
 	SwaggerModule.setup('api', app, document, {
 		swaggerOptions: {
@@ -59,9 +56,12 @@ async function bootstrap() {
 		customCss: '.swagger-ui .topbar { display: none }',
 	});
 
-	await app.listen(port);
-	console.log(`\n🚀 Application is running on: http://localhost:${port}`);
-	console.log(`📚 Swagger documentation available at: http://localhost:${port}/api`);
-	console.log(`🗄️ Database connected successfully\n`);
+	await app.init();
+	const expressApp = app.getHttpAdapter().getInstance();
+	return serverlessExpress({ app: expressApp });
 }
-bootstrap();
+
+export const handler = async (event, context) => {
+	server = server ?? (await bootstrap());
+	return server(event, context);
+};

@@ -39,6 +39,7 @@
     "pg": "^8.13.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
+    "serverless-express": "^2.0.12",
     "swagger-ui-express": "^5.0.1",
     "typeorm": "^0.3.27"
   },
