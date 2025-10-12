@@ -54,6 +54,27 @@ export class UsersService {
 			throw new BadRequestException('User ID is required');
 		}
 
+		// Try to find in Admin table first
+		const admin = await this.adminRepository.findOne({
+			where: { id },
+			relations: ['role', 'profile'],
+		});
+
+		if (admin) {
+			return this.mapAdminToUserResponse(admin);
+		}
+
+		// Then try Staff table
+		const staff = await this.staffRepository.findOne({
+			where: { id },
+			relations: ['role', 'profile'],
+		});
+
+		if (staff) {
+			return this.mapStaffToUserResponse(staff);
+		}
+
+		// Finally try AuthUser table
 		const user = await this.authUserRepository.findOne({
 			where: { id },
 			relations: ['role', 'profile'],
@@ -71,6 +92,27 @@ export class UsersService {
 			throw new BadRequestException('Email is required');
 		}
 
+		// Try to find in Admin table first
+		const admin = await this.adminRepository.findOne({
+			where: { email },
+			relations: ['role', 'profile'],
+		});
+
+		if (admin) {
+			return this.mapAdminToUserResponse(admin);
+		}
+
+		// Then try Staff table
+		const staff = await this.staffRepository.findOne({
+			where: { email },
+			relations: ['role', 'profile'],
+		});
+
+		if (staff) {
+			return this.mapStaffToUserResponse(staff);
+		}
+
+		// Finally try AuthUser table
 		const user = await this.authUserRepository.findByEmail(email);
 
 		if (!user) {
@@ -236,6 +278,67 @@ export class UsersService {
 			throw new BadRequestException('User ID is required');
 		}
 
+		// Try to find in Admin table first
+		const admin = await this.adminRepository.findOne({
+			where: { id },
+			relations: ['profile'],
+		});
+
+		if (admin) {
+			const queryRunner = this.adminRepository.manager.connection.createQueryRunner();
+			await queryRunner.connect();
+			await queryRunner.startTransaction();
+
+			try {
+				// Delete admin profile first if exists
+				if (admin.profile) {
+					await queryRunner.manager.delete(AdminProfile, { id });
+				}
+
+				// Delete admin
+				await queryRunner.manager.delete(Admin, { id });
+
+				await queryRunner.commitTransaction();
+				return;
+			} catch (error) {
+				await queryRunner.rollbackTransaction();
+				throw new BadRequestException('Failed to delete admin user: ' + error.message);
+			} finally {
+				await queryRunner.release();
+			}
+		}
+
+		// Then try Staff table
+		const staff = await this.staffRepository.findOne({
+			where: { id },
+			relations: ['profile'],
+		});
+
+		if (staff) {
+			const queryRunner = this.staffRepository.manager.connection.createQueryRunner();
+			await queryRunner.connect();
+			await queryRunner.startTransaction();
+
+			try {
+				// Delete staff profile first if exists
+				if (staff.profile) {
+					await queryRunner.manager.delete(StaffProfile, { id });
+				}
+
+				// Delete staff
+				await queryRunner.manager.delete(Staff, { id });
+
+				await queryRunner.commitTransaction();
+				return;
+			} catch (error) {
+				await queryRunner.rollbackTransaction();
+				throw new BadRequestException('Failed to delete staff user: ' + error.message);
+			} finally {
+				await queryRunner.release();
+			}
+		}
+
+		// Finally try AuthUser table
 		const user = await this.authUserRepository.findOne({
 			where: { id },
 			relations: ['profile'],
@@ -408,6 +511,42 @@ export class UsersService {
 			},
 			created_at: user.created_at,
 			updated_at: user.updated_at,
+		};
+	}
+
+	/**
+	 * Map Admin entity to UserResponseDto
+	 * Private helper method for consistent response formatting
+	 */
+	private mapAdminToUserResponse(admin: Admin): UserResponseDto {
+		return {
+			id: admin.id,
+			email: admin.email,
+			username: admin.profile?.username || admin.name,
+			role: {
+				id: admin.role.id,
+				name: admin.role.name,
+			},
+			created_at: admin.created_at,
+			updated_at: admin.updated_at,
+		};
+	}
+
+	/**
+	 * Map Staff entity to UserResponseDto
+	 * Private helper method for consistent response formatting
+	 */
+	private mapStaffToUserResponse(staff: Staff): UserResponseDto {
+		return {
+			id: staff.id,
+			email: staff.email,
+			username: staff.profile?.username || staff.name,
+			role: {
+				id: staff.role.id,
+				name: staff.role.name,
+			},
+			created_at: staff.created_at,
+			updated_at: staff.updated_at,
 		};
 	}
 

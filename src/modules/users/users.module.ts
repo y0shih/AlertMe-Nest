@@ -19,4 +19,4 @@ import { AuthModule } from '../auth/auth.module';
 	providers: [UsersService, AuthUserRepository, RoleRepository],
 	exports: [UsersService], // Export for potential use by other modules
 })
-export class UsersModule { }
+export class UsersModule {}
