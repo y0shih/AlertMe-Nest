@@ -6,6 +6,10 @@ import { createClient, SupabaseClient, Provider } from '@supabase/supabase-js';
 import { AuthUser } from '../../entities/auth-user.entity';
 import { Role } from '../../entities/role.entity';
 import { UserProfile } from '../../entities/user-profile.entity';
+import { Staff } from '../../entities/staff.entity';
+import { StaffProfile } from '../../entities/staff-profile.entity';
+import { Admin } from '../../entities/admin.entity';
+import { AdminProfile } from '../../entities/admin-profile.entity';
 
 @Injectable()
 export class AuthService {
@@ -18,6 +22,14 @@ export class AuthService {
 		private roleRepository: Repository<Role>,
 		@InjectRepository(UserProfile)
 		private userProfileRepository: Repository<UserProfile>,
+		@InjectRepository(Staff)
+		private staffRepository: Repository<Staff>,
+		@InjectRepository(StaffProfile)
+		private staffProfileRepository: Repository<StaffProfile>,
+		@InjectRepository(Admin)
+		private adminRepository: Repository<Admin>,
+		@InjectRepository(AdminProfile)
+		private adminProfileRepository: Repository<AdminProfile>,
 		private configService: ConfigService,
 	) {
 		// Initialize Supabase client
@@ -68,6 +80,98 @@ export class AuthService {
 		}
 	}
 
+	async registerStaff(email: string, password: string, username: string, name: string, phone_number?: string) {
+		try {
+			// Check if staff with email already exists
+			const existingStaff = await this.staffRepository.findOne({ where: { email } });
+			if (existingStaff) {
+				throw new ConflictException('Staff with this email already exists');
+			}
+
+			// Check if username is already taken
+			const existingStaffProfile = await this.staffProfileRepository.findOne({ where: { username } });
+			if (existingStaffProfile) {
+				throw new ConflictException('Username is already taken');
+			}
+
+			// Create user in Supabase Auth
+			const { data, error } = await this.supabase.auth.signUp({
+				email,
+				password,
+				options: {
+					data: {
+						username,
+						phone_number,
+						user_type: 'staff',
+					},
+				},
+			});
+
+			if (error) {
+				throw new BadRequestException(error.message);
+			}
+
+			// Get staff role
+			const staffRole = await this.roleRepository.findOne({ where: { name: 'staff' } });
+			if (!staffRole) {
+				throw new BadRequestException('Staff role not found');
+			}
+
+			// Create staff in our database if Supabase user was created
+			if (data.user) {
+				const queryRunner = this.staffRepository.manager.connection.createQueryRunner();
+				await queryRunner.connect();
+				await queryRunner.startTransaction();
+
+				try {
+					// Create staff
+					const staff = queryRunner.manager.create(Staff, {
+						email,
+						name,
+						role_id: staffRole.id,
+					});
+					const savedStaff = await queryRunner.manager.save(staff);
+
+					// Create staff profile
+					const staffProfile = queryRunner.manager.create(StaffProfile, {
+						id: savedStaff.id,
+						username,
+						phone_number,
+					});
+					await queryRunner.manager.save(staffProfile);
+
+					await queryRunner.commitTransaction();
+
+					return {
+						message: 'Staff registration successful!',
+						staff: {
+							id: savedStaff.id,
+							email: savedStaff.email,
+							name: savedStaff.name,
+							username,
+							role: staffRole.name,
+						},
+						requiresEmailVerification: false, // Admin created, so no email verification needed
+					};
+				} catch (dbError) {
+					await queryRunner.rollbackTransaction();
+					// If database creation fails, try to delete the Supabase user
+					await this.supabase.auth.admin.deleteUser(data.user.id);
+					throw new BadRequestException('Failed to create staff: ' + (dbError instanceof Error ? dbError.message : 'Unknown error'));
+				} finally {
+					await queryRunner.release();
+				}
+			}
+
+			throw new BadRequestException('Staff registration failed');
+		} catch (error) {
+			if (error instanceof ConflictException || error instanceof BadRequestException) {
+				throw error;
+			}
+			throw new BadRequestException(error instanceof Error ? error.message : 'Staff registration failed');
+		}
+	}
+
 	async signIn(email: string, password: string) {
 		try {
 			const { data, error } = await this.supabase.auth.signInWithPassword({
@@ -84,10 +188,7 @@ export class AuthService {
 				await this.syncSupabaseUser(data.user);
 
 				// Get user from our database with role information
-				const user = await this.authUserRepository.findOne({
-					where: { email },
-					relations: ['role', 'profile'],
-				});
+				const user = await this.findUserByEmailHierarchy(email);
 
 				return {
 					access_token: data.session.access_token,
@@ -157,13 +258,11 @@ export class AuthService {
 				throw new UnauthorizedException(error.message);
 			}
 
-			if (user) {
+			if (user && user.email) {
 				await this.syncSupabaseUser(user);
 
-				const dbUser = await this.authUserRepository.findOne({
-					where: { email: user.email },
-					relations: ['role', 'profile'],
-				});
+				// Get user from our database with role information
+				const dbUser = await this.findUserByEmailHierarchy(user.email);
 
 				return dbUser;
 			}
@@ -175,6 +274,36 @@ export class AuthService {
 			}
 			throw new UnauthorizedException(error instanceof Error ? error.message : 'Failed to get user');
 		}
+	}
+
+	/**
+	 * Find user by email across the hierarchy: Admin -> Staff -> User
+	 * @param email User's email address
+	 * @param relations Optional relations to load
+	 * @returns User entity (Admin, Staff, or AuthUser) or null if not found
+	 */
+	private async findUserByEmailHierarchy(email: string, relations: string[] = ['role', 'profile']): Promise<Admin | Staff | AuthUser | null> {
+		// Check hierarchy: Admin -> Staff -> User
+		let user: Admin | Staff | AuthUser | null = await this.adminRepository.findOne({
+			where: { email },
+			relations,
+		});
+
+		if (!user) {
+			user = await this.staffRepository.findOne({
+				where: { email },
+				relations,
+			});
+		}
+
+		if (!user) {
+			user = await this.authUserRepository.findOne({
+				where: { email },
+				relations,
+			});
+		}
+
+		return user;
 	}
 
 	/**
@@ -254,21 +383,21 @@ export class AuthService {
 	/**
 	 * Get user by Supabase JWT token
 	 */
-	async getUserFromToken(token: string): Promise<AuthUser | null> {
+	async getUserFromToken(token: string): Promise<Admin | Staff | AuthUser | null> {
 		try {
 			const {
 				data: { user },
 				error,
 			} = await this.supabase.auth.getUser(token);
 
-			if (error || !user) {
+			if (error || !user || !user.email) {
 				return null;
 			}
 
-			return await this.authUserRepository.findOne({
-				where: { email: user.email },
-				relations: ['role', 'profile'],
-			});
+			// Get user from our database with role information
+			const dbUser = await this.findUserByEmailHierarchy(user.email);
+
+			return dbUser;
 		} catch (_error) {
 			return null;
 		}

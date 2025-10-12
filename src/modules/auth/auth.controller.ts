@@ -11,11 +11,14 @@ import {
 	ResetPasswordDto,
 	UpdatePasswordDto,
 	VerifyEmailDto,
+	RegisterStaffDto,
 } from '../../dto/auth.dto';
 import { SupabaseAuthGuard } from './supabase-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { AuthUser } from '../../entities/auth-user.entity';
 import { Public } from './decorators/public.decorator';
+import { RolesGuard } from './roles.guard';
+import { Roles } from './decorators/roles.decorator';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -31,6 +34,27 @@ export class AuthController {
 	@ApiResponse({ status: 409, description: 'User already exists' })
 	async signUp(@Body() signUpDto: SignUpDto) {
 		return this.authService.signUp(signUpDto.email, signUpDto.password, signUpDto.username, signUpDto.phone_number);
+	}
+
+	@Post('staff/sign-up')
+	@HttpCode(HttpStatus.CREATED)
+	@UseGuards(SupabaseAuthGuard, RolesGuard)
+	@Roles('admin', 'superadmin')
+	@ApiBearerAuth('JWT-auth')
+	@ApiOperation({ summary: 'Sign up a new staff member (Admin only)' })
+	@ApiResponse({ status: 201, description: 'Staff successfully created' })
+	@ApiResponse({ status: 400, description: 'Bad request' })
+	@ApiResponse({ status: 401, description: 'Unauthorized' })
+	@ApiResponse({ status: 403, description: 'Forbidden - Admin access required' })
+	@ApiResponse({ status: 409, description: 'Staff already exists' })
+	async registerStaff(@Body() registerStaffDto: RegisterStaffDto) {
+		return this.authService.registerStaff(
+			registerStaffDto.email,
+			registerStaffDto.password,
+			registerStaffDto.username,
+			registerStaffDto.name,
+			registerStaffDto.phone_number,
+		);
 	}
 
 	@Public()

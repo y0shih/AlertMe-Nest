@@ -2,34 +2,6 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEmail, IsString, IsUUID, IsOptional, Length, IsNumber, Min, Max, IsEnum } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 
-export class CreateUserDto {
-	@ApiProperty({
-		description: 'User email address',
-		example: 'john.doe@example.com',
-		format: 'email',
-	})
-	@IsEmail({}, { message: 'Please provide a valid email address' })
-	email: string;
-
-	@ApiProperty({
-		description: 'Unique username for the user',
-		example: 'john_doe',
-		minLength: 3,
-		maxLength: 50,
-	})
-	@IsString({ message: 'Username must be a string' })
-	@Length(3, 50, { message: 'Username must be between 3 and 50 characters' })
-	username: string;
-
-	@ApiProperty({
-		description: 'Role ID for the user',
-		example: 'role-uuid',
-		format: 'uuid',
-	})
-	@IsUUID(4, { message: 'Role ID must be a valid UUID' })
-	role_id: string;
-}
-
 export class UpdateUserDto {
 	@ApiPropertyOptional({
 		description: 'Updated username for the user',

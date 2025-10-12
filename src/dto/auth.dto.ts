@@ -114,3 +114,31 @@ export class VerifyEmailDto {
 	@IsNotEmpty()
 	email: string;
 }
+
+export class RegisterStaffDto {
+	@ApiProperty({ example: 'staff@example.com' })
+	@IsEmail()
+	@IsNotEmpty()
+	email: string;
+
+	@ApiProperty({ example: 'SecurePass123!' })
+	@IsString()
+	@MinLength(6)
+	@IsNotEmpty()
+	password: string;
+
+	@ApiProperty({ example: 'staffuser' })
+	@IsString()
+	@IsNotEmpty()
+	username: string;
+
+	@ApiProperty({ example: 'John Doe' })
+	@IsString()
+	@IsNotEmpty()
+	name: string;
+
+	@ApiProperty({ required: false })
+	@IsString()
+	@IsOptional()
+	phone_number?: string;
+}
