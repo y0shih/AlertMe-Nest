@@ -8,9 +8,10 @@ import { ReportsService } from './reports.service';
 import { ReportsController, SosReportsController } from './reports.controller';
 import { TasksController } from './tasks.controller';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-	imports: [TypeOrmModule.forFeature([Report, SosReport, Task, ReportResponse]), NotificationsModule],
+	imports: [TypeOrmModule.forFeature([Report, SosReport, Task, ReportResponse]), NotificationsModule, AuthModule],
 	controllers: [ReportsController, SosReportsController, TasksController],
 	providers: [ReportsService],
 	exports: [ReportsService],

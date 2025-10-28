@@ -9,7 +9,7 @@ import { Staff } from '../../entities/staff.entity';
 import { StaffProfile } from '../../entities/staff-profile.entity';
 import { Role } from '../../entities/role.entity';
 import { AuthUserRepository } from './user.repository';
-import { CreateUserDto, UpdateUserDto, UserQueryDto, UserResponseDto, PaginatedUserResponse, UserSearchDto } from '../../dto/user.dto';
+import { UpdateUserDto, UserQueryDto, UserResponseDto, PaginatedUserResponse, UserSearchDto } from '../../dto/user.dto';
 
 @Injectable()
 export class UsersService {
@@ -54,6 +54,27 @@ export class UsersService {
 			throw new BadRequestException('User ID is required');
 		}
 
+		// Try to find in Admin table first
+		const admin = await this.adminRepository.findOne({
+			where: { id },
+			relations: ['role', 'profile'],
+		});
+
+		if (admin) {
+			return this.mapAdminToUserResponse(admin);
+		}
+
+		// Then try Staff table
+		const staff = await this.staffRepository.findOne({
+			where: { id },
+			relations: ['role', 'profile'],
+		});
+
+		if (staff) {
+			return this.mapStaffToUserResponse(staff);
+		}
+
+		// Finally try AuthUser table
 		const user = await this.authUserRepository.findOne({
 			where: { id },
 			relations: ['role', 'profile'],
@@ -71,6 +92,27 @@ export class UsersService {
 			throw new BadRequestException('Email is required');
 		}
 
+		// Try to find in Admin table first
+		const admin = await this.adminRepository.findOne({
+			where: { email },
+			relations: ['role', 'profile'],
+		});
+
+		if (admin) {
+			return this.mapAdminToUserResponse(admin);
+		}
+
+		// Then try Staff table
+		const staff = await this.staffRepository.findOne({
+			where: { email },
+			relations: ['role', 'profile'],
+		});
+
+		if (staff) {
+			return this.mapStaffToUserResponse(staff);
+		}
+
+		// Finally try AuthUser table
 		const user = await this.authUserRepository.findByEmail(email);
 
 		if (!user) {
@@ -78,79 +120,6 @@ export class UsersService {
 		}
 
 		return this.mapToUserResponse(user);
-	}
-
-	async createUser(createUserDto: CreateUserDto): Promise<UserResponseDto> {
-		const { email, username, role_id } = createUserDto;
-
-		// Validate role exists
-		const role = await this.roleRepository.findOne({ where: { id: role_id } });
-		if (!role) {
-			throw new BadRequestException('Invalid role ID provided');
-		}
-
-		// Route to staff tables for STAFF role
-		if (role.name === 'staff') {
-			return this.createStaffUser(email, username, role_id, role);
-		}
-
-		// Route to admin tables for admin/superadmin
-		if (role.name === 'admin' || role.name === 'superadmin') {
-			return this.createAdminUser(email, username, role_id, role);
-		}
-
-		// Regular user creation (USER role)
-		// Check if user with email already exists
-		const existingUserByEmail = await this.authUserRepository.findByEmail(email);
-		if (existingUserByEmail) {
-			throw new ConflictException('User with this email already exists');
-		}
-
-		// Check if username is already taken
-		const existingUserByUsername = await this.authUserRepository.findByUsernameOrEmail(username);
-		if (existingUserByUsername && existingUserByUsername.profile?.username === username) {
-			throw new ConflictException('Username is already taken');
-		}
-
-		// Create user with profile in a transaction
-		const queryRunner = this.authUserRepository.manager.connection.createQueryRunner();
-		await queryRunner.connect();
-		await queryRunner.startTransaction();
-
-		try {
-			// Create auth user
-			const authUser = queryRunner.manager.create(AuthUser, {
-				email,
-				role_id,
-			});
-			const savedAuthUser = await queryRunner.manager.save(authUser);
-
-			// Create user profile
-			const userProfile = queryRunner.manager.create(UserProfile, {
-				id: savedAuthUser.id, // Use same ID as auth user
-				username,
-			});
-			await queryRunner.manager.save(userProfile);
-
-			await queryRunner.commitTransaction();
-
-			// Fetch the complete user with relations
-			const createdUser = await this.authUserRepository.findOne({
-				where: { id: savedAuthUser.id },
-				relations: ['role', 'profile'],
-			});
-
-			if (!createdUser) {
-				throw new BadRequestException('Failed to retrieve created user');
-			}
-
-			return this.mapToUserResponse(createdUser);
-		} catch (error) {
-			await queryRunner.rollbackTransaction();
-			throw new BadRequestException('Failed to create user: ' + error.message);
-		} finally {
-			await queryRunner.release();
-		}
 	}
 
 	async updateUser(id: string, updateUserDto: UpdateUserDto): Promise<UserResponseDto> {
@@ -236,6 +205,67 @@ export class UsersService {
 			throw new BadRequestException('User ID is required');
 		}
 
+		// Try to find in Admin table first
+		const admin = await this.adminRepository.findOne({
+			where: { id },
+			relations: ['profile'],
+		});
+
+		if (admin) {
+			const queryRunner = this.adminRepository.manager.connection.createQueryRunner();
+			await queryRunner.connect();
+			await queryRunner.startTransaction();
+
+			try {
+				// Delete admin profile first if exists
+				if (admin.profile) {
+					await queryRunner.manager.delete(AdminProfile, { id });
+				}
+
+				// Delete admin
+				await queryRunner.manager.delete(Admin, { id });
+
+				await queryRunner.commitTransaction();
+				return;
+			} catch (error) {
+				await queryRunner.rollbackTransaction();
+				throw new BadRequestException('Failed to delete admin user: ' + error.message);
+			} finally {
+				await queryRunner.release();
+			}
+		}
+
+		// Then try Staff table
+		const staff = await this.staffRepository.findOne({
+			where: { id },
+			relations: ['profile'],
+		});
+
+		if (staff) {
+			const queryRunner = this.staffRepository.manager.connection.createQueryRunner();
+			await queryRunner.connect();
+			await queryRunner.startTransaction();
+
+			try {
+				// Delete staff profile first if exists
+				if (staff.profile) {
+					await queryRunner.manager.delete(StaffProfile, { id });
+				}
+
+				// Delete staff
+				await queryRunner.manager.delete(Staff, { id });
+
+				await queryRunner.commitTransaction();
+				return;
+			} catch (error) {
+				await queryRunner.rollbackTransaction();
+				throw new BadRequestException('Failed to delete staff user: ' + error.message);
+			} finally {
+				await queryRunner.release();
+			}
+		}
+
+		// Finally try AuthUser table
 		const user = await this.authUserRepository.findOne({
 			where: { id },
 			relations: ['profile'],
@@ -272,127 +302,6 @@ export class UsersService {
 		const users = await this.authUserRepository.searchUsers(criteria);
 		return users.map((user) => this.mapToUserResponse(user));
 	}
-
-	/**
-	 * Create staff user in staff tables
-	 * Private helper method for STAFF role
-	 */
-	private async createStaffUser(email: string, username: string, role_id: string, role: Role): Promise<UserResponseDto> {
-		// Check if staff with email already exists
-		const existingStaff = await this.staffRepository.findOne({ where: { email } });
-		if (existingStaff) {
-			throw new ConflictException('Staff with this email already exists');
-		}
-
-		// Check if username is already taken in staff_profiles
-		const existingStaffProfile = await this.staffProfileRepository.findOne({ where: { username } });
-		if (existingStaffProfile) {
-			throw new ConflictException('Username is already taken');
-		}
-
-		// Create staff with profile in a transaction
-		const queryRunner = this.staffRepository.manager.connection.createQueryRunner();
-		await queryRunner.connect();
-		await queryRunner.startTransaction();
-
-		try {
-			// Create staff
-			const staff = queryRunner.manager.create(Staff, {
-				email,
-				name: username, // Use username as name for now
-				role_id,
-			});
-			const savedStaff = await queryRunner.manager.save(staff);
-
-			// Create staff profile
-			const staffProfile = queryRunner.manager.create(StaffProfile, {
-				id: savedStaff.id, // Use same ID as staff
-				username,
-			});
-			await queryRunner.manager.save(staffProfile);
-
-			await queryRunner.commitTransaction();
-
-			// Return response in standard format
-			return {
-				id: savedStaff.id,
-				email: savedStaff.email,
-				username,
-				role: {
-					id: role.id,
-					name: role.name,
-				},
-				created_at: savedStaff.created_at,
-				updated_at: savedStaff.updated_at,
-			};
-		} catch (error) {
-			await queryRunner.rollbackTransaction();
-			throw new BadRequestException('Failed to create staff user: ' + error.message);
-		} finally {
-			await queryRunner.release();
-		}
-	}
-
-	/**
-	 * Create admin user in admin tables
-	 * Private helper method for ADMIN/SUPERADMIN roles
-	 */
-	private async createAdminUser(email: string, username: string, role_id: string, role: Role): Promise<UserResponseDto> {
-		// Check if admin with email already exists
-		const existingAdmin = await this.adminRepository.findOne({ where: { email } });
-		if (existingAdmin) {
-			throw new ConflictException('Admin with this email already exists');
-		}
-
-		// Check if username is already taken in admin_profiles
-		const existingAdminProfile = await this.adminProfileRepository.findOne({ where: { username } });
-		if (existingAdminProfile) {
-			throw new ConflictException('Username is already taken');
-		}
-
-		// Create admin with profile in a transaction
-		const queryRunner = this.adminRepository.manager.connection.createQueryRunner();
-		await queryRunner.connect();
-		await queryRunner.startTransaction();
-
-		try {
-			// Create admin
-			const admin = queryRunner.manager.create(Admin, {
-				email,
-				name: username, // Use username as name for now
-				role_id,
-			});
-			const savedAdmin = await queryRunner.manager.save(admin);
-
-			// Create admin profile
-			const adminProfile = queryRunner.manager.create(AdminProfile, {
-				id: savedAdmin.id, // Use same ID as admin
-				username,
-			});
-			await queryRunner.manager.save(adminProfile);
-
-			await queryRunner.commitTransaction();
-
-			// Return response in standard format
-			return {
-				id: savedAdmin.id,
-				email: savedAdmin.email,
-				username,
-				role: {
-					id: role.id,
-					name: role.name,
-				},
-				created_at: savedAdmin.created_at,
-				updated_at: savedAdmin.updated_at,
-			};
-		} catch (error) {
-			await queryRunner.rollbackTransaction();
-			throw new BadRequestException('Failed to create admin user: ' + error.message);
-		} finally {
-			await queryRunner.release();
-		}
-	}
-
 	/**
 	 * Map AuthUser entity to UserResponseDto
 	 * Private helper method for consistent response formatting
@@ -408,6 +317,42 @@ export class UsersService {
 			},
 			created_at: user.created_at,
 			updated_at: user.updated_at,
+		};
+	}
+
+	/**
+	 * Map Admin entity to UserResponseDto
+	 * Private helper method for consistent response formatting
+	 */
+	private mapAdminToUserResponse(admin: Admin): UserResponseDto {
+		return {
+			id: admin.id,
+			email: admin.email,
+			username: admin.profile?.username || admin.name,
+			role: {
+				id: admin.role.id,
+				name: admin.role.name,
+			},
+			created_at: admin.created_at,
+			updated_at: admin.updated_at,
+		};
+	}
+
+	/**
+	 * Map Staff entity to UserResponseDto
+	 * Private helper method for consistent response formatting
+	 */
+	private mapStaffToUserResponse(staff: Staff): UserResponseDto {
+		return {
+			id: staff.id,
+			email: staff.email,
+			username: staff.profile?.username || staff.name,
+			role: {
+				id: staff.role.id,
+				name: staff.role.name,
+			},
+			created_at: staff.created_at,
+			updated_at: staff.updated_at,
 		};
 	}
 
