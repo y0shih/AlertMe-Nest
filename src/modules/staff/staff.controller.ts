@@ -1,9 +1,14 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { StaffService } from './staff.service';
 import { CreateStaffDto, UpdateStaffDto, StaffResponseDto } from '../../dto/staff.dto';
+import { SupabaseAuthGuard } from '../auth/supabase-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 
 @ApiTags('Staff')
+@ApiBearerAuth('JWT-auth')
+@UseGuards(SupabaseAuthGuard, RolesGuard)
 @Controller('staff')
 export class StaffController {
 	constructor(private readonly staffService: StaffService) {}
@@ -14,6 +19,7 @@ export class StaffController {
 	@ApiResponse({ status: 400, description: 'Bad request - validation failed' })
 	@ApiResponse({ status: 409, description: 'Staff member with this email already exists' })
 	@ApiResponse({ status: 404, description: 'Role not found' })
+	@Roles('admin', 'superadmin')
 	async create(@Body() createStaffDto: CreateStaffDto): Promise<StaffResponseDto> {
 		return this.staffService.create(createStaffDto);
 	}
@@ -35,6 +41,7 @@ export class StaffController {
 			},
 		},
 	})
+	@Roles('admin', 'superadmin', 'staff')
 	async findAll(
 		@Query('page') page?: number,
 		@Query('limit') limit?: number,
@@ -46,6 +53,7 @@ export class StaffController {
 	@ApiOperation({ summary: 'Get all staff members by role ID (Admin)' })
 	@ApiParam({ name: 'roleId', description: 'Role UUID', type: String })
 	@ApiResponse({ status: 200, description: 'List of staff members with the specified role', type: [StaffResponseDto] })
+	@Roles('admin', 'superadmin')
 	async findByRole(@Param('roleId') roleId: string): Promise<StaffResponseDto[]> {
 		return this.staffService.findByRole(roleId);
 	}
@@ -55,6 +63,7 @@ export class StaffController {
 	@ApiParam({ name: 'id', description: 'Staff UUID', type: String })
 	@ApiResponse({ status: 200, description: 'Staff member details', type: StaffResponseDto })
 	@ApiResponse({ status: 404, description: 'Staff member not found' })
+	@Roles('admin', 'superadmin', 'staff')
 	async findOne(@Param('id') id: string): Promise<StaffResponseDto> {
 		return this.staffService.findOne(id);
 	}
@@ -65,6 +74,7 @@ export class StaffController {
 	@ApiResponse({ status: 200, description: 'Staff member successfully updated', type: StaffResponseDto })
 	@ApiResponse({ status: 400, description: 'Bad request - validation failed' })
 	@ApiResponse({ status: 404, description: 'Staff member not found' })
+	@Roles('admin', 'superadmin')
 	async update(@Param('id') id: string, @Body() updateStaffDto: UpdateStaffDto): Promise<StaffResponseDto> {
 		return this.staffService.update(id, updateStaffDto);
 	}
@@ -74,6 +84,7 @@ export class StaffController {
 	@ApiParam({ name: 'id', description: 'Staff UUID', type: String })
 	@ApiResponse({ status: 200, description: 'Staff member successfully deleted' })
 	@ApiResponse({ status: 404, description: 'Staff member not found' })
+	@Roles('admin', 'superadmin')
 	async remove(@Param('id') id: string): Promise<{ message: string }> {
 		await this.staffService.remove(id);
 		return { message: 'Staff member deleted successfully' };

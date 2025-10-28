@@ -25,8 +25,8 @@ async function bootstrap() {
 	);
 
 	const config = new DocumentBuilder()
-		.setTitle('hello')
-		.setDescription('alo alo')
+		.setTitle('AlertMe API')
+		.setDescription('API documentation for AlertMe')
 		.setVersion('1.0')
 		.addBearerAuth(
 			{
