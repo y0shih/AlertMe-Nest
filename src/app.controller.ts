@@ -1,8 +1,8 @@
-import { Controller, Get, Post, UseInterceptors, UploadedFile, BadRequestException, UseGuards } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { Controller, Get, Post, UseInterceptors, UploadedFiles, BadRequestException, UseGuards } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiConsumes, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { AppService } from './app.service';
-import { StorageService, UploadResult } from './modules/storage/storage.service';
+import { StorageService, MultipleUploadResult } from './modules/storage/storage.service';
 import { SupabaseAuthGuard } from './modules/auth/supabase-auth.guard';
 
 @ApiTags('App')
@@ -22,16 +22,19 @@ export class AppController {
 	@Post('upload')
 	@ApiBearerAuth('JWT-auth')
 	@UseGuards(SupabaseAuthGuard)
-	@ApiOperation({ summary: 'Upload image to Supabase Storage - returns URL to use in report/response payloads' })
+	@ApiOperation({ summary: 'Upload one or multiple images to Supabase Storage (1-5 files) - returns URLs array' })
 	@ApiConsumes('multipart/form-data')
 	@ApiBody({
 		schema: {
 			type: 'object',
 			properties: {
-				file: {
-					type: 'string',
-					format: 'binary',
-					description: 'Image file (JPEG, PNG, GIF, WEBP) - max 10MB',
+				files: {
+					type: 'array',
+					items: {
+						type: 'string',
+						format: 'binary',
+					},
+					description: 'Image file(s) (JPEG, PNG, GIF, WEBP) - 1 to 5 files, max 10MB each',
 				},
 				folder: {
 					type: 'string',
@@ -39,18 +42,23 @@ export class AppController {
 					default: 'uploads',
 				},
 			},
-			required: ['file'],
+			required: ['files'],
 		},
 	})
-	@UseInterceptors(FileInterceptor('file'))
-	async uploadFile(@UploadedFile() file: Express.Multer.File): Promise<UploadResult> {
-		if (!file) {
-			throw new BadRequestException('No file uploaded');
+	@UseInterceptors(FilesInterceptor('files', 5))
+	async uploadFiles(@UploadedFiles() files: Express.Multer.File[]): Promise<MultipleUploadResult> {
+		if (!files || files.length === 0) {
+			throw new BadRequestException('No files uploaded');
 		}
 
-		// Default to 'uploads' folder, but could be extracted from form data if needed
+		// Default to 'uploads' folder
 		const folder = 'uploads';
 
-		return this.storageService.uploadFile(file.buffer, file.originalname, folder);
+		const fileData = files.map((file) => ({
+			buffer: file.buffer,
+			filename: file.originalname,
+		}));
+
+		return this.storageService.uploadMultipleFiles(fileData, folder);
 	}
 }
