@@ -10,8 +10,8 @@ import {
 	ResetPasswordRequestDto,
 	ResetPasswordDto,
 	UpdatePasswordDto,
-	VerifyEmailDto,
 	RegisterStaffDto,
+	ResendVerificationEmailDto,
 } from '../../dto/auth.dto';
 import { SupabaseAuthGuard } from './supabase-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
@@ -185,7 +185,7 @@ export class AuthController {
 	@ApiOperation({ summary: 'Resend verification email' })
 	@ApiResponse({ status: 200, description: 'Verification email sent' })
 	@ApiResponse({ status: 400, description: 'Bad request' })
-	async resendVerificationEmail(@Body() verifyEmailDto: VerifyEmailDto) {
-		return this.authService.resendVerificationEmail(verifyEmailDto.email);
+	async resendVerificationEmail(@Body() resendVerificationEmailDto: ResendVerificationEmailDto) {
+		return this.authService.resendVerificationEmail(resendVerificationEmailDto.email);
 	}
 }

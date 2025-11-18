@@ -103,18 +103,6 @@ export class UpdatePasswordDto {
 	new_password: string;
 }
 
-export class VerifyEmailDto {
-	@ApiProperty()
-	@IsString()
-	@IsNotEmpty()
-	token: string;
-
-	@ApiProperty()
-	@IsEmail()
-	@IsNotEmpty()
-	email: string;
-}
-
 export class RegisterStaffDto {
 	@ApiProperty({ example: 'staff@example.com' })
 	@IsEmail()
@@ -141,4 +129,11 @@ export class RegisterStaffDto {
 	@IsString()
 	@IsOptional()
 	phone_number?: string;
+}
+
+export class ResendVerificationEmailDto {
+	@ApiProperty({ example: 'user@example.com' })
+	@IsEmail()
+	@IsNotEmpty()
+	email: string;
 }
