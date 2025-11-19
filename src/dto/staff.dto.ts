@@ -118,6 +118,9 @@ export class StaffResponseDto {
 	@ApiProperty({ description: 'Role UUID', example: '123e4567-e89b-12d3-a456-426614174001' })
 	role_id: string;
 
+	@ApiProperty({ description: 'Is new user flag', example: true })
+	is_new_user: boolean;
+
 	@ApiProperty({
 		description: 'Staff member profile information',
 		example: {

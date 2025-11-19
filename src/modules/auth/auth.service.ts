@@ -553,6 +553,13 @@ export class AuthService {
 				throw new BadRequestException(error.message);
 			}
 
+			// If the user is a staff member, update is_new_user to false
+			const staff = await this.staffRepository.findOne({ where: { email } });
+			if (staff && staff.is_new_user) {
+				staff.is_new_user = false;
+				await this.staffRepository.save(staff);
+			}
+
 			return {
 				message: 'Password successfully updated',
 			};

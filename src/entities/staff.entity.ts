@@ -17,6 +17,9 @@ export class Staff {
 	@Column({ type: 'uuid' })
 	role_id: string;
 
+	@Column({ type: 'boolean', default: true })
+	is_new_user: boolean;
+
 	@Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
 	created_at: Date;
 

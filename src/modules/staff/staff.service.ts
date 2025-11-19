@@ -149,6 +149,12 @@ export class StaffService {
 		return this.mapToResponseDto(staff, updatedProfile, staff.role);
 	}
 
+	async updateProfile(id: string, updateStaffDto: UpdateStaffDto): Promise<StaffResponseDto> {
+		// Re-use the update logic but restrict what can be updated if needed
+		// For now, it seems safe to reuse the update logic as the DTO controls the fields
+		return this.update(id, updateStaffDto);
+	}
+
 	async remove(id: string): Promise<void> {
 		const staff = await this.staffRepository.findOne({ where: { id } });
 
@@ -165,6 +171,7 @@ export class StaffService {
 			email: staff.email,
 			name: staff.name,
 			role_id: staff.role_id,
+			is_new_user: staff.is_new_user,
 			profile: {
 				id: profile.id,
 				username: profile.username,
