@@ -12,7 +12,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 @UseGuards(SupabaseAuthGuard, RolesGuard)
 @Controller('staff')
 export class StaffController {
-	constructor(private readonly staffService: StaffService) { }
+	constructor(private readonly staffService: StaffService) {}
 
 	@Post()
 	@ApiOperation({ summary: 'Create a new staff member (Admin)' })
@@ -97,7 +97,7 @@ export class StaffController {
 		// In our system, the CurrentUser decorator returns the entity found in findUserByEmailHierarchy
 		// So if they are logged in as staff, user should be a Staff entity
 
-		// However, let's rely on the service to find the staff by ID or Email if needed. 
+		// However, let's rely on the service to find the staff by ID or Email if needed.
 		// But here we have the ID from the authenticated user.
 
 		return this.staffService.updateProfile(user.id, updateStaffDto);

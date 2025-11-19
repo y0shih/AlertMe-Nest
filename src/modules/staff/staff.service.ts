@@ -48,6 +48,8 @@ export class StaffService {
 				email: createStaffDto.email,
 				name: createStaffDto.name,
 				role_id: createStaffDto.role_id,
+				task_given: 0,
+				task_completed: 0,
 			});
 
 			const savedStaff = await queryRunner.manager.save(Staff, staff);
@@ -183,6 +185,8 @@ export class StaffService {
 				country: profile.country,
 				profilepic: profile.profilepic,
 			},
+			task_given: staff.task_given,
+			task_completed: staff.task_completed,
 			created_at: staff.created_at,
 			updated_at: staff.updated_at,
 		};

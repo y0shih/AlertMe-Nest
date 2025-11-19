@@ -147,6 +147,11 @@ export class StaffResponseDto {
 		profilepic?: string;
 	};
 
+	@ApiProperty({ description: 'Task given to staff', example: '2025-10-10T12:00:00Z' })
+	task_given: number;
+	@ApiProperty({ description: 'Task completed by staff', example: '2025-10-10T12:00:00Z' })
+	task_completed: number;
+
 	@ApiProperty({ description: 'Timestamp when the staff member was created', example: '2025-10-10T12:00:00Z' })
 	created_at: Date;
 

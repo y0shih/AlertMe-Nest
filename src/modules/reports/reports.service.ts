@@ -5,6 +5,7 @@ import { Report } from '../../entities/report.entity';
 import { SosReport } from '../../entities/sos-report.entity';
 import { Task } from '../../entities/task.entity';
 import { ReportResponse } from '../../entities/report-response.entity';
+import { Staff } from '../../entities/staff.entity';
 import { ReportStatus, TaskStatus } from '../../enums/user-role.enum';
 import { CreateReportDto, CreateSosReportDto, ListReportsQueryDto } from '../../dto/reports.dto';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -32,6 +33,8 @@ export class ReportsService {
 		private taskRepository: Repository<Task>,
 		@InjectRepository(ReportResponse)
 		private reportResponseRepository: Repository<ReportResponse>,
+		@InjectRepository(Staff)
+		private staffRepository: Repository<Staff>,
 		private readonly notificationsService: NotificationsService,
 	) {}
 
@@ -150,6 +153,9 @@ export class ReportsService {
 
 		const savedTask = await this.taskRepository.save(task);
 
+		// Increment task_given counter for the assigned staff
+		await this.staffRepository.increment({ id: staffUserId }, 'task_given', 1);
+
 		// Update report status to IN_PROGRESS if still PENDING
 		if (report.status === ReportStatus.PENDING) {
 			await this.reportRepository.update(reportId, { status: ReportStatus.IN_PROGRESS });
@@ -233,6 +239,9 @@ export class ReportsService {
 		// Mark task as completed (does NOT resolve the report - Admin does that)
 		await this.taskRepository.update(taskId, { status: TaskStatus.COMPLETED });
 
+		// Increment task_completed counter for the staff member
+		await this.staffRepository.increment({ id: staffUserId }, 'task_completed', 1);
+
 		const completedTask = await this.taskRepository.findOne({
 			where: { id: taskId },
 			relations: ['report', 'assignedBy', 'assignedTo'],
@@ -249,9 +258,27 @@ export class ReportsService {
 	 * Update task status (for Staff role)
 	 */
 	async updateTaskStatus(taskId: string, status: TaskStatus): Promise<Task> {
-		const task = await this.taskRepository.findOne({ where: { id: taskId } });
+		const task = await this.taskRepository.findOne({
+			where: { id: taskId },
+			relations: ['report', 'assignedBy', 'assignedTo'],
+		});
 		if (!task) {
 			throw new Error(`Task with ID ${taskId} not found`);
+		}
+
+		const oldStatus = task.status;
+		const newStatus = status;
+
+		// Handle counter updates based on status transitions
+		if (task.assigned_to) {
+			// Transitioning TO completed
+			if (newStatus === TaskStatus.COMPLETED && oldStatus !== TaskStatus.COMPLETED) {
+				await this.staffRepository.increment({ id: task.assigned_to }, 'task_completed', 1);
+			}
+			// Transitioning FROM completed to something else
+			else if (oldStatus === TaskStatus.COMPLETED && newStatus !== TaskStatus.COMPLETED) {
+				await this.staffRepository.decrement({ id: task.assigned_to }, 'task_completed', 1);
+			}
 		}
 
 		await this.taskRepository.update(taskId, { status });

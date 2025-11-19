@@ -20,6 +20,12 @@ export class Staff {
 	@Column({ type: 'boolean', default: true })
 	is_new_user: boolean;
 
+	@Column({ type: 'int', default: 0 })
+	task_given: number;
+
+	@Column({ type: 'int', default: 0 })
+	task_completed: number;
+
 	@Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
 	created_at: Date;
 
