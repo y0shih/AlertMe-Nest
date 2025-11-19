@@ -208,6 +208,47 @@ export class AuthService {
 		}
 	}
 
+	async signInAdmin(email: string, password: string) {
+		try {
+			const { data, error } = await this.supabase.auth.signInWithPassword({
+				email,
+				password,
+			});
+
+			if (error) {
+				throw new UnauthorizedException('Invalid credentials');
+			}
+
+			if (data.user && data.session) {
+				// Sync user data with our database
+				await this.syncSupabaseUser(data.user);
+
+				// Get user from our database with role information
+				const user = await this.findUserByEmailHierarchy(email);
+
+				// Ensure this account is an admin
+				if (!user || (!(user instanceof Admin) && !(user['role'] && user['role'].name === 'admin'))) {
+					throw new UnauthorizedException('Admin access required');
+				}
+
+				return {
+					access_token: data.session.access_token,
+					refresh_token: data.session.refresh_token,
+					user: user,
+					expires_in: data.session.expires_in,
+					expires_at: data.session.expires_at,
+				};
+			}
+
+			throw new UnauthorizedException('Login failed');
+		} catch (error) {
+			if (error instanceof UnauthorizedException) {
+				throw error;
+			}
+			throw new UnauthorizedException(error instanceof Error ? error.message : 'Login failed');
+		}
+	}
+
 	async signOut(_accessToken: string) {
 		try {
 			const { error } = await this.supabase.auth.signOut();

@@ -12,6 +12,7 @@ import {
 	UpdatePasswordDto,
 	RegisterStaffDto,
 	ResendVerificationEmailDto,
+	SignInAdminDto,
 } from '../../dto/auth.dto';
 import { SupabaseAuthGuard } from './supabase-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
@@ -65,6 +66,16 @@ export class AuthController {
 	@ApiResponse({ status: 401, description: 'Unauthorized' })
 	async signIn(@Body() signInDto: SignInDto) {
 		return this.authService.signIn(signInDto.email, signInDto.password);
+	}
+
+	@Public()
+	@Post('admin/signin')
+	@HttpCode(HttpStatus.OK)
+	@ApiOperation({ summary: 'Sign in user' })
+	@ApiResponse({ status: 200, description: 'User successfully signed in' })
+	@ApiResponse({ status: 401, description: 'Unauthorized' })
+	async signInAdmin(@Body() signInAdminDto: SignInAdminDto) {
+		return this.authService.signInAdmin(signInAdminDto.email, signInAdminDto.password);
 	}
 
 	@Post('signout')

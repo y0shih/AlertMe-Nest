@@ -36,6 +36,17 @@ export class SignInDto {
 	password: string;
 }
 
+export class SignInAdminDto {
+	@ApiProperty({ example: 'admin@example.com' })
+	@IsEmail()
+	@IsNotEmpty()
+	email: string;
+
+	@ApiProperty({ example: 'SecurePass123!' })
+	@IsString()
+	@IsNotEmpty()
+	password: string;
+}
 export class RefreshTokenDto {
 	@ApiProperty()
 	@IsString()
