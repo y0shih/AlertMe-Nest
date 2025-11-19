@@ -15,7 +15,7 @@ export class StaffController {
 	constructor(private readonly staffService: StaffService) {}
 
 	@Post()
-	@ApiOperation({ summary: 'Create a new staff member (Admin)' })
+	@ApiOperation({ summary: 'Create a new staff member (Admin) (Bỏ r)' })
 	@ApiResponse({ status: 201, description: 'Staff member successfully created', type: StaffResponseDto })
 	@ApiResponse({ status: 400, description: 'Bad request - validation failed' })
 	@ApiResponse({ status: 409, description: 'Staff member with this email already exists' })
