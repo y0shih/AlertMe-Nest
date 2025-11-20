@@ -10,13 +10,14 @@ import { ApiTags, ApiOperation, ApiParam, ApiBearerAuth } from '@nestjs/swagger'
 import { SupabaseAuthGuard } from '../auth/supabase-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 
 @ApiTags('Reports')
 @ApiBearerAuth('JWT-auth')
 @UseGuards(SupabaseAuthGuard, RolesGuard)
 @Controller('reports')
 export class ReportsController {
-	constructor(private readonly reportsService: ReportsService) { }
+	constructor(private readonly reportsService: ReportsService) {}
 
 	// List all reports with filters
 	@Get()
@@ -28,9 +29,9 @@ export class ReportsController {
 
 	@Get('list')
 	@ApiOperation({ summary: 'List all small-scaled reports (id, name, lat, lng)' })
-	@Roles('user', 'admin', 'superadmin', 'staff')
-	async listSmall(@Query() query: ListReportsQueryDto): Promise<Partial<Report>[]> {
-		return this.reportsService.listSmallReports(query);
+	@Public()
+	async listSmall(): Promise<Partial<Report>[]> {
+		return this.reportsService.listSmallReports();
 	}
 
 	// User: Get my submitted reports
