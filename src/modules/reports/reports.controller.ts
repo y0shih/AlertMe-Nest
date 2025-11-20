@@ -16,14 +16,21 @@ import { Roles } from '../auth/decorators/roles.decorator';
 @UseGuards(SupabaseAuthGuard, RolesGuard)
 @Controller('reports')
 export class ReportsController {
-	constructor(private readonly reportsService: ReportsService) {}
+	constructor(private readonly reportsService: ReportsService) { }
 
-	// Admin: List all reports with filters
+	// List all reports with filters
 	@Get()
-	@ApiOperation({ summary: 'List all reports with pagination and filters (Admin)' })
-	@Roles('admin', 'superadmin', 'staff')
+	@ApiOperation({ summary: 'List all reports with pagination and filters' })
+	@Roles('user', 'admin', 'superadmin', 'staff')
 	async list(@Query() query: ListReportsQueryDto): Promise<PaginatedReportsResponse> {
 		return this.reportsService.listReports(query);
+	}
+
+	@Get('list')
+	@ApiOperation({ summary: 'List all small-scaled reports (id, name, lat, lng)' })
+	@Roles('user', 'admin', 'superadmin', 'staff')
+	async listSmall(@Query() query: ListReportsQueryDto): Promise<Partial<Report>[]> {
+		return this.reportsService.listSmallReports(query);
 	}
 
 	// User: Get my submitted reports
@@ -82,7 +89,7 @@ export class ReportsController {
 @UseGuards(SupabaseAuthGuard, RolesGuard)
 @Controller('sos-reports')
 export class SosReportsController {
-	constructor(private readonly reportsService: ReportsService) {}
+	constructor(private readonly reportsService: ReportsService) { }
 
 	@Post()
 	@Roles('user', 'admin', 'superadmin')

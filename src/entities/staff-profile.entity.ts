@@ -8,6 +8,9 @@ export class StaffProfile {
 	@PrimaryGeneratedColumn('uuid')
 	id: string;
 
+	@Column({ type: 'varchar', nullable: true })
+	email: string;
+
 	@Column({ type: 'varchar' })
 	username: string;
 

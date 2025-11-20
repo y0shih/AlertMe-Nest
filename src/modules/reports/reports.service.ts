@@ -36,7 +36,7 @@ export class ReportsService {
 		@InjectRepository(Staff)
 		private staffRepository: Repository<Staff>,
 		private readonly notificationsService: NotificationsService,
-	) {}
+	) { }
 
 	/**
 	 * Get a single report by ID with all relations
@@ -106,6 +106,31 @@ export class ReportsService {
 			data,
 			pagination: { page, limit, total, totalPages },
 		};
+	}
+
+	/**
+	 * List all reports with minimal details (id, name, lat, lng)
+	 */
+	async listSmallReports(query: ListReportsQueryDto): Promise<Partial<Report>[]> {
+		const qb = this.reportRepository
+			.createQueryBuilder('report')
+			.select(['report.id', 'report.name', 'report.lat', 'report.lng'])
+			.orderBy('report.created_at', 'DESC');
+
+		if (query.status !== undefined) {
+			qb.andWhere('report.status = :status', { status: query.status });
+		}
+		if (query.user_id) {
+			qb.andWhere('report.user_id = :user_id', { user_id: query.user_id });
+		}
+		if (query.date_from) {
+			qb.andWhere('report.created_at >= :date_from', { date_from: query.date_from });
+		}
+		if (query.date_to) {
+			qb.andWhere('report.created_at <= :date_to', { date_to: query.date_to });
+		}
+
+		return qb.getMany();
 	}
 
 	/**

@@ -59,6 +59,11 @@ export class CreateStaffDto {
 }
 
 export class UpdateStaffDto {
+	@ApiPropertyOptional({ description: 'Staff member email address', example: 'john.doe@example.com' })
+	@IsEmail()
+	@IsOptional()
+	email?: string;
+
 	@ApiPropertyOptional({ description: 'Full name of the staff member', example: 'John Doe' })
 	@IsString()
 	@IsOptional()

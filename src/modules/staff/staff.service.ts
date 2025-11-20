@@ -16,7 +16,7 @@ export class StaffService {
 		@InjectRepository(Role)
 		private roleRepository: Repository<Role>,
 		private dataSource: DataSource,
-	) {}
+	) { }
 
 	async create(createStaffDto: CreateStaffDto): Promise<StaffResponseDto> {
 		// Check if email already exists
@@ -127,9 +127,27 @@ export class StaffService {
 			throw new NotFoundException('Staff member not found');
 		}
 
-		// Update staff entity if name is provided
+		// Check if email is being updated and if it already exists
+		if (updateStaffDto.email && updateStaffDto.email !== staff.email) {
+			const existingStaff = await this.staffRepository.findOne({
+				where: { email: updateStaffDto.email },
+			});
+
+			if (existingStaff) {
+				throw new ConflictException('Staff member with this email already exists');
+			}
+		}
+
+		// Update staff entity fields
+		if (updateStaffDto.email) {
+			staff.email = updateStaffDto.email;
+		}
 		if (updateStaffDto.name) {
 			staff.name = updateStaffDto.name;
+		}
+
+		// Save staff if any staff fields were updated
+		if (updateStaffDto.email || updateStaffDto.name) {
 			await this.staffRepository.save(staff);
 		}
 
