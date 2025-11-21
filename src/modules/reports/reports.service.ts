@@ -36,7 +36,7 @@ export class ReportsService {
 		@InjectRepository(Staff)
 		private staffRepository: Repository<Staff>,
 		private readonly notificationsService: NotificationsService,
-	) {}
+	) { }
 
 	/**
 	 * Get a single report by ID with all relations
@@ -114,7 +114,7 @@ export class ReportsService {
 	async listSmallReports(): Promise<Partial<Report>[]> {
 		const qb = this.reportRepository
 			.createQueryBuilder('report')
-			.select(['report.id', 'report.name', 'report.lat', 'report.lng', 'report.status', 'report.created_at'])
+			.select(['report.id', 'report.name', 'report.lat', 'report.lng', 'report.status', 'report.created_at', 'report.attachment_paths'])
 			.orderBy('report.created_at', 'DESC');
 		return qb.getMany();
 	}
