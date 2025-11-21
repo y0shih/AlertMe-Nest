@@ -28,7 +28,7 @@ export class ReportsController {
 	}
 
 	@Get('list')
-	@ApiOperation({ summary: 'List all small-scaled reports (id, name, lat, lng)' })
+	@ApiOperation({ summary: 'List all small-scaled reports (id, name, lat, lng, status, created_at)' })
 	@Public()
 	async listSmall(): Promise<Partial<Report>[]> {
 		return this.reportsService.listSmallReports();

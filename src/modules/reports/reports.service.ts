@@ -114,7 +114,7 @@ export class ReportsService {
 	async listSmallReports(): Promise<Partial<Report>[]> {
 		const qb = this.reportRepository
 			.createQueryBuilder('report')
-			.select(['report.id', 'report.name', 'report.lat', 'report.lng'])
+			.select(['report.id', 'report.name', 'report.lat', 'report.lng', 'report.status', 'report.created_at'])
 			.orderBy('report.created_at', 'DESC');
 		return qb.getMany();
 	}
