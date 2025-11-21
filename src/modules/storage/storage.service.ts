@@ -4,7 +4,6 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { randomUUID } from 'crypto';
 
 export interface UploadResult {
-	path: string;
 	publicUrl: string;
 }
 
@@ -75,7 +74,6 @@ export class StorageService {
 			} = this.supabase.storage.from(this.bucketName).getPublicUrl(data.path);
 
 			return {
-				path: data.path,
 				publicUrl,
 			};
 		} catch (error) {
