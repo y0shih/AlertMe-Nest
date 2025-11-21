@@ -23,7 +23,7 @@ export default registerAs('database', (): TypeOrmModuleOptions => {
 		database,
 		ssl: { rejectUnauthorized: false },
 		synchronize: false,
-		logging: process.env.NODE_ENV === 'development',
+		logging: false,
 		entities: ['dist/**/*.entity{.ts,.js}'],
 		migrations: ['dist/migrations/*{.ts,.js}'],
 		autoLoadEntities: true,

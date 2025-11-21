@@ -16,7 +16,7 @@ export class StaffService {
 		@InjectRepository(Role)
 		private roleRepository: Repository<Role>,
 		private dataSource: DataSource,
-	) { }
+	) {}
 
 	async create(createStaffDto: CreateStaffDto): Promise<StaffResponseDto> {
 		// Check if email already exists

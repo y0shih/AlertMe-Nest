@@ -90,7 +90,7 @@ export class ReportsController {
 @UseGuards(SupabaseAuthGuard, RolesGuard)
 @Controller('sos-reports')
 export class SosReportsController {
-	constructor(private readonly reportsService: ReportsService) { }
+	constructor(private readonly reportsService: ReportsService) {}
 
 	@Post()
 	@Roles('user', 'admin', 'superadmin')
