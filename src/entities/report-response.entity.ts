@@ -29,9 +29,6 @@ export class ReportResponse {
 	@Column({ type: 'float', nullable: true })
 	lng?: number;
 
-	@Column({ type: 'boolean', default: false })
-	is_reviewed: boolean;
-
 	@Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
 	responded_at: Date;
 

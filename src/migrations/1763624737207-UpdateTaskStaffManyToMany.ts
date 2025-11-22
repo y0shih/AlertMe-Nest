@@ -1,94 +1,121 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class UpdateTaskStaffManyToMany1737536400000 implements MigrationInterface {
-	name = 'UpdateTaskStaffManyToMany1737536400000';
+export class UpdateTaskStaffManyToMany1763624737207 implements MigrationInterface {
+	name = 'UpdateTaskStaffManyToMany1763624737207';
 
 	public async up(queryRunner: QueryRunner): Promise<void> {
 		// 1. Update report_responses table - change attachment_path to attachment_paths (JSON array)
-		await queryRunner.query(`
-			ALTER TABLE "report_responses" 
-			ADD COLUMN "attachment_paths" json
+		// Check if attachment_paths already exists
+		const attachmentPathsExists = await queryRunner.query(`
+			SELECT column_name 
+			FROM information_schema.columns 
+			WHERE table_name='report_responses' AND column_name='attachment_paths'
 		`);
 
-		// Migrate existing attachment_path data to attachment_paths array
-		await queryRunner.query(`
-			UPDATE "report_responses" 
-			SET "attachment_paths" = json_build_array("attachment_path")
-			WHERE "attachment_path" IS NOT NULL
-		`);
+		if (attachmentPathsExists.length === 0) {
+			await queryRunner.query(`
+				ALTER TABLE "report_responses" 
+				ADD COLUMN "attachment_paths" json
+			`);
 
-		// Drop old attachment_path column
-		await queryRunner.query(`
-			ALTER TABLE "report_responses" 
-			DROP COLUMN "attachment_path"
-		`);
+			// Migrate existing attachment_path data to attachment_paths array
+			const attachmentPathExists = await queryRunner.query(`
+				SELECT column_name 
+				FROM information_schema.columns 
+				WHERE table_name='report_responses' AND column_name='attachment_path'
+			`);
+
+			if (attachmentPathExists.length > 0) {
+				await queryRunner.query(`
+					UPDATE "report_responses" 
+					SET "attachment_paths" = json_build_array("attachment_path")
+					WHERE "attachment_path" IS NOT NULL
+				`);
+
+				// Drop old attachment_path column
+				await queryRunner.query(`
+					ALTER TABLE "report_responses" 
+					DROP COLUMN "attachment_path"
+				`);
+			}
+		}
 
 		// 2. Add GPS coordinates to report_responses
-		await queryRunner.query(`
-			ALTER TABLE "report_responses" 
-			ADD COLUMN "lat" float,
-			ADD COLUMN "lng" float
+		const latExists = await queryRunner.query(`
+			SELECT column_name 
+			FROM information_schema.columns 
+			WHERE table_name='report_responses' AND column_name='lat'
 		`);
 
-		// 3. Add is_reviewed flag to report_responses
-		await queryRunner.query(`
-			ALTER TABLE "report_responses" 
-			ADD COLUMN "is_reviewed" boolean NOT NULL DEFAULT false
+		if (latExists.length === 0) {
+			await queryRunner.query(`
+				ALTER TABLE "report_responses" 
+				ADD COLUMN "lat" float,
+				ADD COLUMN "lng" float
+			`);
+		}
+
+		// 3. Create junction table for many-to-many relationship between tasks and staff
+		const tableExists = await queryRunner.query(`
+			SELECT table_name 
+			FROM information_schema.tables 
+			WHERE table_name='task_staff_assignments'
 		`);
 
-		// 4. Create junction table for many-to-many relationship between tasks and staff
-		await queryRunner.query(`
-			CREATE TABLE "task_staff_assignments" (
-				"task_id" uuid NOT NULL,
-				"staff_profile_id" uuid NOT NULL,
-				CONSTRAINT "PK_task_staff_assignments" PRIMARY KEY ("task_id", "staff_profile_id")
-			)
-		`);
+		if (tableExists.length === 0) {
+			await queryRunner.query(`
+				CREATE TABLE "task_staff_assignments" (
+					"task_id" uuid NOT NULL,
+					"staff_profile_id" uuid NOT NULL,
+					CONSTRAINT "PK_task_staff_assignments" PRIMARY KEY ("task_id", "staff_profile_id")
+				)
+			`);
 
-		// Add foreign keys
-		await queryRunner.query(`
+			// Add foreign keys
+			await queryRunner.query(`
 			ALTER TABLE "task_staff_assignments"
 			ADD CONSTRAINT "FK_task_staff_assignments_task"
 			FOREIGN KEY ("task_id") REFERENCES "tasks"("id")
 			ON DELETE CASCADE ON UPDATE CASCADE
 		`);
 
-		await queryRunner.query(`
+			await queryRunner.query(`
 			ALTER TABLE "task_staff_assignments"
 			ADD CONSTRAINT "FK_task_staff_assignments_staff"
 			FOREIGN KEY ("staff_profile_id") REFERENCES "staff_profiles"("id")
 			ON DELETE CASCADE ON UPDATE CASCADE
 		`);
 
-		// Create indexes for better query performance
-		await queryRunner.query(`
+			// Create indexes for better query performance
+			await queryRunner.query(`
 			CREATE INDEX "IDX_task_staff_assignments_task_id"
 			ON "task_staff_assignments" ("task_id")
 		`);
 
-		await queryRunner.query(`
+			await queryRunner.query(`
 			CREATE INDEX "IDX_task_staff_assignments_staff_profile_id"
 			ON "task_staff_assignments" ("staff_profile_id")
 		`);
 
-		// 5. Migrate existing task assignments from tasks.assigned_to to junction table
-		await queryRunner.query(`
+			// 5. Migrate existing task assignments from tasks.assigned_to to junction table
+			await queryRunner.query(`
 			INSERT INTO "task_staff_assignments" ("task_id", "staff_profile_id")
 			SELECT "id", "assigned_to"
 			FROM "tasks"
 			WHERE "assigned_to" IS NOT NULL
 		`);
 
-		// 6. Drop the old assigned_to column from tasks table
-		await queryRunner.query(`
+			// 6. Drop the old assigned_to column from tasks table
+			await queryRunner.query(`
 			ALTER TABLE "tasks" 
 			DROP CONSTRAINT IF EXISTS "FK_task_assigned_to_staff_profile"
 		`);
 
-		await queryRunner.query(`
+			await queryRunner.query(`
 			ALTER TABLE "tasks" 
 			DROP COLUMN "assigned_to"
 		`);
+		}
 	}
 
 	public async down(queryRunner: QueryRunner): Promise<void> {
@@ -120,20 +147,14 @@ export class UpdateTaskStaffManyToMany1737536400000 implements MigrationInterfac
 		// 2. Drop junction table
 		await queryRunner.query(`DROP TABLE "task_staff_assignments"`);
 
-		// 3. Remove is_reviewed from report_responses
-		await queryRunner.query(`
-			ALTER TABLE "report_responses" 
-			DROP COLUMN "is_reviewed"
-		`);
-
-		// 4. Remove GPS coordinates from report_responses
+		// 3. Remove GPS coordinates from report_responses
 		await queryRunner.query(`
 			ALTER TABLE "report_responses" 
 			DROP COLUMN "lat",
 			DROP COLUMN "lng"
 		`);
 
-		// 5. Revert attachment_paths back to attachment_path
+		// 4. Revert attachment_paths back to attachment_path
 		await queryRunner.query(`
 			ALTER TABLE "report_responses" 
 			ADD COLUMN "attachment_path" varchar

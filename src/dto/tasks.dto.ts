@@ -103,9 +103,3 @@ export class UpdateTaskStatusDto {
 	@IsEnum(TaskStatus, { message: 'status must be a valid TaskStatus' })
 	status: TaskStatus;
 }
-
-export class MarkResponseReviewedDto {
-	@ApiProperty({ description: 'Response UUID to mark as reviewed', example: 'response-uuid' })
-	@IsUUID(4, { message: 'response_id must be a valid UUID' })
-	response_id: string;
-}

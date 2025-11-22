@@ -1,12 +1,11 @@
 import { Controller, Get, Post, Put, Param, Body, Query, UseGuards } from '@nestjs/common';
 import { ReportsService, PaginatedReportsResponse } from './reports.service';
 import { Report } from '../../entities/report.entity';
-import { ReportResponse } from '../../entities/report-response.entity';
 import { Task } from '../../entities/task.entity';
 import { SosReport } from '../../entities/sos-report.entity';
 import { ReportStatus } from '../../enums/user-role.enum';
 import { CreateReportDto, CreateSosReportDto, ListReportsQueryDto } from '../../dto/reports.dto';
-import { AssignStaffDto, UpdateReportStatusDto, MarkResponseReviewedDto } from '../../dto/tasks.dto';
+import { AssignStaffDto, UpdateReportStatusDto } from '../../dto/tasks.dto';
 import { ApiTags, ApiOperation, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { SupabaseAuthGuard } from '../auth/supabase-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -18,7 +17,7 @@ import { Public } from '../auth/decorators/public.decorator';
 @UseGuards(SupabaseAuthGuard, RolesGuard)
 @Controller('reports')
 export class ReportsController {
-	constructor(private readonly reportsService: ReportsService) {}
+	constructor(private readonly reportsService: ReportsService) { }
 
 	// List all reports with filters
 	@Get()
@@ -84,14 +83,6 @@ export class ReportsController {
 	async updateStatus(@Param('id') reportId: string, @Body() dto: UpdateReportStatusDto): Promise<Report> {
 		return this.reportsService.updateReportStatus(reportId, dto.status as ReportStatus);
 	}
-
-	// Admin: Mark response as reviewed
-	@Put('responses/mark-reviewed')
-	@ApiOperation({ summary: 'Mark a report response as reviewed (Admin)' })
-	@Roles('admin', 'superadmin')
-	async markResponseReviewed(@Body() dto: MarkResponseReviewedDto): Promise<ReportResponse> {
-		return this.reportsService.markResponseReviewed(dto.response_id);
-	}
 }
 
 @ApiTags('SOS Reports')
@@ -99,7 +90,7 @@ export class ReportsController {
 @UseGuards(SupabaseAuthGuard, RolesGuard)
 @Controller('sos-reports')
 export class SosReportsController {
-	constructor(private readonly reportsService: ReportsService) {}
+	constructor(private readonly reportsService: ReportsService) { }
 
 	@Post()
 	@Roles('user', 'admin', 'superadmin')

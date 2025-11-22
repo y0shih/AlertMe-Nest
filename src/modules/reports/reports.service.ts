@@ -36,7 +36,7 @@ export class ReportsService {
 		@InjectRepository(Staff)
 		private staffRepository: Repository<Staff>,
 		private readonly notificationsService: NotificationsService,
-	) {}
+	) { }
 
 	/**
 	 * Get a single report by ID with all relations
@@ -256,7 +256,6 @@ export class ReportsService {
 			attachment_paths: attachmentPaths,
 			lat,
 			lng,
-			is_reviewed: false,
 		});
 
 		const savedResponse = await this.reportResponseRepository.save(response);
@@ -347,31 +346,5 @@ export class ReportsService {
 			throw new Error(`Task with ID ${taskId} not found after update`);
 		}
 		return updatedTask;
-	}
-
-	/**
-	 * Mark a report response as reviewed by admin
-	 */
-	async markResponseReviewed(responseId: string): Promise<ReportResponse> {
-		const response = await this.reportResponseRepository.findOne({
-			where: { id: responseId },
-		});
-
-		if (!response) {
-			throw new Error(`Response with ID ${responseId} not found`);
-		}
-
-		await this.reportResponseRepository.update(responseId, { is_reviewed: true });
-
-		const updatedResponse = await this.reportResponseRepository.findOne({
-			where: { id: responseId },
-			relations: ['report', 'task', 'respondedBy'],
-		});
-
-		if (!updatedResponse) {
-			throw new Error(`Response with ID ${responseId} not found after update`);
-		}
-
-		return updatedResponse;
 	}
 }
