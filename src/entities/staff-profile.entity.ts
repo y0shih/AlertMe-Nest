@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToOne, JoinColumn, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToOne, JoinColumn, OneToMany, ManyToMany } from 'typeorm';
 import { Staff } from './staff.entity';
 import { ReportResponse } from './report-response.entity';
 import { Task } from './task.entity';
@@ -45,7 +45,7 @@ export class StaffProfile {
 	@JoinColumn({ name: 'id' })
 	staff: Staff;
 
-	@OneToMany(() => Task, (task) => task.assignedTo)
+	@ManyToMany(() => Task, (task) => task.assignedStaff)
 	assignedTasks: Task[];
 
 	@OneToMany(() => ReportResponse, (response) => response.respondedBy)

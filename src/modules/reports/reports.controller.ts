@@ -72,7 +72,7 @@ export class ReportsController {
 	@Roles('admin', 'superadmin')
 	async assignStaff(@Param('id') reportId: string, @Body() dto: AssignStaffDto): Promise<Task> {
 		// TODO: Extract assigned_by from auth token when auth is implemented
-		return this.reportsService.assignStaff(reportId, dto.staff_user_id, dto.assigned_by, dto.task_details);
+		return this.reportsService.assignStaff(reportId, dto.staff_user_ids, dto.assigned_by, dto.task_details);
 	}
 
 	// Admin: Update report status

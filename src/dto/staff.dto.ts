@@ -162,4 +162,38 @@ export class StaffResponseDto {
 
 	@ApiProperty({ description: 'Timestamp when the staff member was last updated', example: '2025-10-10T12:00:00Z' })
 	updated_at: Date;
+
+	@ApiPropertyOptional({
+		description: 'Tasks assigned to this staff member',
+		example: [
+			{
+				id: '123e4567-e89b-12d3-a456-426614174002',
+				report_id: '123e4567-e89b-12d3-a456-426614174003',
+				task_details: 'Investigate reported issue',
+				status: 'in_progress',
+				created_at: '2025-10-10T12:00:00Z',
+				updated_at: '2025-10-10T12:00:00Z',
+				report: {
+					id: '123e4567-e89b-12d3-a456-426614174003',
+					name: 'Broken streetlight',
+					details: 'Streetlight at Main St is not working',
+					status: 'in_progress',
+				},
+			},
+		],
+	})
+	assigned_tasks?: {
+		id: string;
+		report_id: string;
+		task_details: string;
+		status: string;
+		created_at: Date;
+		updated_at: Date;
+		report?: {
+			id: string;
+			name: string;
+			details: string;
+			status: string;
+		};
+	}[];
 }

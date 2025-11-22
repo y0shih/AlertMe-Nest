@@ -97,7 +97,7 @@ export class StaffService {
 	async findOne(id: string): Promise<StaffResponseDto> {
 		const staff = await this.staffRepository.findOne({
 			where: { id },
-			relations: ['profile', 'role'],
+			relations: ['profile', 'role', 'profile.assignedTasks', 'profile.assignedTasks.report'],
 		});
 
 		if (!staff) {
@@ -186,7 +186,7 @@ export class StaffService {
 	}
 
 	private mapToResponseDto(staff: Staff, profile: StaffProfile, _role: Role): StaffResponseDto {
-		return {
+		const response: any = {
 			id: staff.id,
 			email: staff.email,
 			name: staff.name,
@@ -208,5 +208,27 @@ export class StaffService {
 			created_at: staff.created_at,
 			updated_at: staff.updated_at,
 		};
+
+		// Include assigned tasks if loaded
+		if (profile.assignedTasks) {
+			response.assigned_tasks = profile.assignedTasks.map((task) => ({
+				id: task.id,
+				report_id: task.report_id,
+				task_details: task.task_details,
+				status: task.status,
+				created_at: task.created_at,
+				updated_at: task.updated_at,
+				report: task.report
+					? {
+							id: task.report.id,
+							name: task.report.name,
+							details: task.report.details,
+							status: task.report.status,
+						}
+					: undefined,
+			}));
+		}
+
+		return response;
 	}
 }

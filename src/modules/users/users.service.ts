@@ -122,21 +122,51 @@ export class UsersService {
 		return this.mapToUserResponse(user);
 	}
 
-	async updateUser(id: string, updateUserDto: UpdateUserDto): Promise<UserResponseDto> {
+	async updateUser(id: string, updateUserDto: UpdateUserDto, currentUserId: string): Promise<UserResponseDto> {
 		if (!id) {
 			throw new BadRequestException('User ID is required');
 		}
 
+		// Get current user (actor) information
+		const currentUser = await this.findById(currentUserId);
+
+		// Get target user information
 		const user = await this.authUserRepository.findOne({
 			where: { id },
 			relations: ['role', 'profile'],
 		});
 
 		if (!user) {
+			// Try to find in other tables
+			const admin = await this.adminRepository.findOne({
+				where: { id },
+				relations: ['role', 'profile'],
+			});
+
+			if (admin) {
+				// Check RBAC for admin users
+				this.canModifyUser(currentUser.role.name, admin.role.name, currentUserId, id);
+				throw new BadRequestException('Updating admin users is not supported through this endpoint');
+			}
+
+			const staff = await this.staffRepository.findOne({
+				where: { id },
+				relations: ['role', 'profile'],
+			});
+
+			if (staff) {
+				// Check RBAC for staff users
+				this.canModifyUser(currentUser.role.name, staff.role.name, currentUserId, id);
+				throw new BadRequestException('Updating staff users is not supported through this endpoint');
+			}
+
 			throw new NotFoundException(`User with ID ${id} not found`);
 		}
 
-		const { username, role_id } = updateUserDto;
+		// Check RBAC permissions
+		this.canModifyUser(currentUser.role.name, user.role.name, currentUserId, id);
+
+		const { username, role_id, phone_number, address, city, state, postal_code, country, profilepic } = updateUserDto;
 
 		// Check username uniqueness if provided
 		if (username && username !== user.profile?.username) {
@@ -165,15 +195,25 @@ export class UsersService {
 				await queryRunner.manager.update(AuthUser, { id }, { role_id });
 			}
 
-			// Update user profile if username changed
-			if (username && username !== user.profile?.username) {
+			// Update user profile fields
+			const profileUpdates: Partial<UserProfile> = {};
+			if (username !== undefined) profileUpdates.username = username;
+			if (phone_number !== undefined) profileUpdates.phone_number = phone_number;
+			if (address !== undefined) profileUpdates.address = address;
+			if (city !== undefined) profileUpdates.city = city;
+			if (state !== undefined) profileUpdates.state = state;
+			if (postal_code !== undefined) profileUpdates.postal_code = postal_code;
+			if (country !== undefined) profileUpdates.country = country;
+			if (profilepic !== undefined) profileUpdates.profilepic = profilepic;
+
+			if (Object.keys(profileUpdates).length > 0) {
 				if (user.profile) {
-					await queryRunner.manager.update(UserProfile, { id }, { username });
+					await queryRunner.manager.update(UserProfile, { id }, profileUpdates);
 				} else {
 					// Create profile if it doesn't exist
 					const userProfile = queryRunner.manager.create(UserProfile, {
 						id,
-						username,
+						...profileUpdates,
 					});
 					await queryRunner.manager.save(userProfile);
 				}
@@ -200,18 +240,23 @@ export class UsersService {
 		}
 	}
 
-	async deleteUser(id: string): Promise<void> {
+	async deleteUser(id: string, currentUserId: string): Promise<void> {
 		if (!id) {
 			throw new BadRequestException('User ID is required');
 		}
 
+		// Get current user (actor) information
+		const currentUser = await this.findById(currentUserId);
+
 		// Try to find in Admin table first
 		const admin = await this.adminRepository.findOne({
 			where: { id },
-			relations: ['profile'],
+			relations: ['role', 'profile'],
 		});
 
 		if (admin) {
+			// Check RBAC permissions
+			this.canModifyUser(currentUser.role.name, admin.role.name, currentUserId, id);
 			const queryRunner = this.adminRepository.manager.connection.createQueryRunner();
 			await queryRunner.connect();
 			await queryRunner.startTransaction();
@@ -238,10 +283,12 @@ export class UsersService {
 		// Then try Staff table
 		const staff = await this.staffRepository.findOne({
 			where: { id },
-			relations: ['profile'],
+			relations: ['role', 'profile'],
 		});
 
 		if (staff) {
+			// Check RBAC permissions
+			this.canModifyUser(currentUser.role.name, staff.role.name, currentUserId, id);
 			const queryRunner = this.staffRepository.manager.connection.createQueryRunner();
 			await queryRunner.connect();
 			await queryRunner.startTransaction();
@@ -268,12 +315,15 @@ export class UsersService {
 		// Finally try AuthUser table
 		const user = await this.authUserRepository.findOne({
 			where: { id },
-			relations: ['profile'],
+			relations: ['role', 'profile'],
 		});
 
 		if (!user) {
 			throw new NotFoundException(`User with ID ${id} not found`);
 		}
+
+		// Check RBAC permissions
+		this.canModifyUser(currentUser.role.name, user.role.name, currentUserId, id);
 
 		// Delete user in a transaction (cascade will handle profile deletion)
 		const queryRunner = this.authUserRepository.manager.connection.createQueryRunner();
@@ -315,6 +365,13 @@ export class UsersService {
 				id: user.role.id,
 				name: user.role.name,
 			},
+			phone_number: user.profile?.phone_number,
+			address: user.profile?.address,
+			city: user.profile?.city,
+			state: user.profile?.state,
+			postal_code: user.profile?.postal_code,
+			country: user.profile?.country,
+			profilepic: user.profile?.profilepic,
 			created_at: user.created_at,
 			updated_at: user.updated_at,
 		};
@@ -333,6 +390,13 @@ export class UsersService {
 				id: admin.role.id,
 				name: admin.role.name,
 			},
+			phone_number: admin.profile?.phone_number,
+			address: admin.profile?.address,
+			city: admin.profile?.city,
+			state: admin.profile?.state,
+			postal_code: admin.profile?.postal_code,
+			country: admin.profile?.country,
+			profilepic: admin.profile?.profilepic,
 			created_at: admin.created_at,
 			updated_at: admin.updated_at,
 		};
@@ -351,6 +415,13 @@ export class UsersService {
 				id: staff.role.id,
 				name: staff.role.name,
 			},
+			phone_number: staff.profile?.phone_number,
+			address: staff.profile?.address,
+			city: staff.profile?.city,
+			state: staff.profile?.state,
+			postal_code: staff.profile?.postal_code,
+			country: staff.profile?.country,
+			profilepic: staff.profile?.profilepic,
 			created_at: staff.created_at,
 			updated_at: staff.updated_at,
 		};
@@ -362,5 +433,37 @@ export class UsersService {
 	 */
 	async getAllRoles() {
 		return await this.roleRepository.find();
+	}
+
+	/**
+	 * Get role hierarchy level for RBAC checks
+	 * Higher number = higher privilege
+	 */
+	private getRoleLevel(roleName: string): number {
+		const levels: Record<string, number> = {
+			user: 1,
+			staff: 2,
+			admin: 3,
+			superadmin: 4,
+		};
+		return levels[roleName] || 0;
+	}
+
+	/**
+	 * Check if actor has permission to modify target user based on role hierarchy
+	 */
+	private canModifyUser(actorRole: string, targetRole: string, _actorId: string, _targetId: string): void {
+		const actorLevel = this.getRoleLevel(actorRole);
+		const targetLevel = this.getRoleLevel(targetRole);
+
+		// Users cannot modify anyone (including themselves) through admin endpoints
+		if (actorLevel <= 1) {
+			throw new BadRequestException('Insufficient permissions to perform this action');
+		}
+
+		// Cannot modify users with equal or higher privilege
+		if (targetLevel >= actorLevel) {
+			throw new BadRequestException('Cannot modify users with equal or higher privileges');
+		}
 	}
 }
