@@ -28,7 +28,8 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 
 	async handleConnection(client: Socket) {
 		try {
-			const token: string | undefined = client.handshake.auth?.token || client.handshake.headers?.authorization?.split(' ')[1];
+			const authHeader = client.handshake.headers?.authorization;
+			const token: string | undefined = client.handshake.auth?.token || (authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : undefined);
 
 			if (!token || typeof token !== 'string') {
 				Logger.log('[Tracking] No token provided, disconnecting...');
