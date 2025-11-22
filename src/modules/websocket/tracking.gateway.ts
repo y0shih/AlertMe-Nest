@@ -10,7 +10,7 @@ import {
 import { Server, Socket } from 'socket.io';
 import { Logger, UseGuards } from '@nestjs/common';
 import { WsAuthGuard } from './websocket-auth.guard';
-import { AuthService } from '../auth/auth.service';
+import { validate as uuidValidate } from 'uuid';
 
 @UseGuards(WsAuthGuard)
 @WebSocketGateway({
@@ -24,44 +24,31 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 	@WebSocketServer()
 	server: Server;
 
-	constructor(private readonly authService: AuthService) {}
+	constructor() {}
+
+	private validateReportId(reportId: any): boolean {
+		return !!(reportId && typeof reportId === 'string' && reportId.trim() !== '' && uuidValidate(reportId));
+	}
+
+	private validateCoordinateData(data: any): boolean {
+		return data && typeof data === 'object' && this.validateReportId(data.reportId) && typeof data.lat === 'number' && typeof data.lng === 'number';
+	}
 
 	async handleConnection(client: Socket) {
-		try {
-			const authHeader = client.handshake.headers?.authorization;
-			const token: string | undefined = client.handshake.auth?.token || (authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : undefined);
+		const userId = client.data.userId;
+		const role = client.data.role;
 
-			if (!token || typeof token !== 'string') {
-				Logger.log('[Tracking] No token provided, disconnecting...');
-				client.disconnect();
-				return;
-			}
+		if (!userId || !role) {
+			Logger.log('[Tracking] No user data, disconnecting...');
+			client.disconnect();
+			return;
+		}
 
-			const user = await this.authService.getUserFromToken(token);
+		Logger.log(`[Tracking] Client connected: ${userId} (${role})`);
 
-			if (!user) {
-				Logger.log('[Tracking] Invalid token or user not found, disconnecting...');
-				client.disconnect();
-				return;
-			}
-
-			client.data.user = user;
-			client.data.userId = user.id;
-			client.data.email = user.email;
-			client.data.role = user['role']?.name || 'user';
-
-			const userId = client.data.userId;
-			const role = client.data.role;
-
-			Logger.log(`[Tracking] Client connected: ${userId} (${role})`);
-
-			// Only staff and admins can connect to tracking
-			if (role !== 'staff' && role !== 'admin' && role !== 'superadmin') {
-				Logger.log(`[Tracking] Unauthorized role: ${role}, disconnecting...`);
-				client.disconnect();
-			}
-		} catch (error) {
-			Logger.error('[Tracking] Connection error:', error);
+		// Only staff and admins can connect to tracking
+		if (role !== 'staff' && role !== 'admin' && role !== 'superadmin') {
+			Logger.log(`[Tracking] Unauthorized role: ${role}, disconnecting...`);
 			client.disconnect();
 		}
 	}
@@ -78,6 +65,11 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 	handleJoinReport(@ConnectedSocket() client: Socket, @MessageBody() reportId: string) {
 		const userId = client.data.userId;
 		const role = client.data.role;
+
+		if (!this.validateReportId(reportId)) {
+			Logger.log('[Tracking] Invalid reportId in joinReport');
+			return;
+		}
 
 		// Only staff and admin can join tracking
 		if (role === 'staff' || role === 'admin' || role === 'superadmin') {
@@ -98,6 +90,12 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 	@SubscribeMessage('leaveReport')
 	handleLeaveReport(@ConnectedSocket() client: Socket, @MessageBody() reportId: string) {
 		const userId = client.data.userId;
+
+		if (!this.validateReportId(reportId)) {
+			Logger.log('[Tracking] Invalid reportId in leaveReport');
+			return;
+		}
+
 		void client.leave(`report_${reportId}`);
 		console.log(`[Tracking] ${userId} left report_${reportId}`);
 
@@ -114,6 +112,11 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 	handleUpdateCoordinate(@ConnectedSocket() client: Socket, @MessageBody() data: { reportId: string; lat: number; lng: number }) {
 		const userId = client.data.userId;
 		const role = client.data.role;
+
+		if (!this.validateCoordinateData(data)) {
+			Logger.log('[Tracking] Invalid data in updateCoordinate');
+			return;
+		}
 
 		// Only staff can broadcast coordinates
 		if (role === 'staff') {
@@ -136,6 +139,11 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 	@SubscribeMessage('requestPositions')
 	handleRequestPositions(@ConnectedSocket() client: Socket, @MessageBody() reportId: string) {
 		const role = client.data.role;
+
+		if (!this.validateReportId(reportId)) {
+			Logger.log('[Tracking] Invalid reportId in requestPositions');
+			return;
+		}
 
 		// Only admins can request positions
 		if (role === 'admin' || role === 'superadmin') {

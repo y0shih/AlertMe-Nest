@@ -10,7 +10,6 @@ import {
 import { Server, Socket } from 'socket.io';
 import { Logger, UseGuards } from '@nestjs/common';
 import { WsAuthGuard } from './websocket-auth.guard';
-import { AuthService } from '../auth/auth.service';
 
 @UseGuards(WsAuthGuard)
 @WebSocketGateway({
@@ -24,55 +23,34 @@ export class AlertsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 	@WebSocketServer()
 	server: Server;
 
-	constructor(private readonly authService: AuthService) {}
+	constructor() {}
 
 	async handleConnection(client: Socket) {
-		try {
-			const token: string | undefined = client.handshake.auth?.token || client.handshake.headers?.authorization?.split(' ')[1];
+		const userId = client.data.userId;
+		const role = client.data.role;
 
-			if (!token || typeof token !== 'string') {
-				// console.log('[Alerts] No token provided, disconnecting...');
-				client.disconnect();
-				return;
-			}
-
-			const user = await this.authService.getUserFromToken(token);
-
-			if (!user) {
-				// console.log('[Alerts] Invalid token or user not found, disconnecting...');
-				client.disconnect();
-				return;
-			}
-
-			client.data.user = user;
-			client.data.userId = user.id;
-			client.data.email = user.email;
-			// Access role safely from the entity relations
-			client.data.role = user['role']?.name || 'user';
-
-			const userId = client.data.userId;
-			const role = client.data.role;
-
-			// console.log(`[Alerts] Client connected: ${userId} (${role})`);
-
-			// Auto-join role-based rooms
-			if (role === 'admin' || role === 'superadmin') {
-				void client.join('admin_notifications');
-				// console.log(`[Alerts] ${userId} joined admin_notifications`);
-			}
-
-			if (role === 'staff') {
-				void client.join('staff_notifications');
-				// console.log(`[Alerts] ${userId} joined staff_notifications`);
-			}
-
-			// Personal notification room
-			void client.join(`user_${userId}`);
-			// console.log(`[Alerts] ${userId} joined user_${userId}`);
-		} catch (error) {
-			Logger.error('[Alerts] Connection error:', error);
+		if (!userId || !role) {
+			Logger.log('[Alerts] No user data, disconnecting...');
 			client.disconnect();
+			return;
 		}
+
+		Logger.log(`[Alerts] Client connected: ${userId} (${role})`);
+
+		// Auto-join role-based rooms
+		if (role === 'admin' || role === 'superadmin') {
+			void client.join('admin_notifications');
+			Logger.log(`[Alerts] ${userId} joined admin_notifications`);
+		}
+
+		if (role === 'staff') {
+			void client.join('staff_notifications');
+			Logger.log(`[Alerts] ${userId} joined staff_notifications`);
+		}
+
+		// Personal notification room
+		void client.join(`user_${userId}`);
+		Logger.log(`[Alerts] ${userId} joined user_${userId}`);
 	}
 
 	handleDisconnect(client: Socket) {
