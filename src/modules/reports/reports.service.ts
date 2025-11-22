@@ -221,7 +221,7 @@ export class ReportsService {
 	/**
 	 * Add status update with notes, optional images, and GPS coordinates (for Staff role)
 	 * Auto-transitions task from NOT_RECEIVED -> RECEIVED on first update
-	 * Auto-transitions task from RECEIVED -> IN_PROGRESS if location data provided
+	 * Auto-transitions task from RECEIVED -> IN_PROGRESS on any subsequent update
 	 */
 	async addStatusUpdate(
 		reportId: string,
@@ -260,14 +260,15 @@ export class ReportsService {
 
 		const savedResponse = await this.reportResponseRepository.save(response);
 
-		// Auto-transition task status based on current state and update content
+		// Auto-transition task status based on current state
 		if (task.status === TaskStatus.NOT_RECEIVED) {
-			// First update: NOT_RECEIVED -> RECEIVED
+			// First update: NOT_RECEIVED -> RECEIVED (task acknowledged)
 			await this.taskRepository.update(taskId, { status: TaskStatus.RECEIVED });
-		} else if (task.status === TaskStatus.RECEIVED && (lat || lng || attachmentPaths?.length)) {
-			// If staff provides location or photos, assume work has started: RECEIVED -> IN_PROGRESS
+		} else if (task.status === TaskStatus.RECEIVED) {
+			// Any subsequent update: RECEIVED -> IN_PROGRESS (work has started)
 			await this.taskRepository.update(taskId, { status: TaskStatus.IN_PROGRESS });
 		}
+		// Once IN_PROGRESS, status remains IN_PROGRESS until explicitly completed
 
 		return savedResponse;
 	}
