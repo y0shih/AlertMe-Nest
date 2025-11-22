@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToMany, ManyToMany, JoinTable } from 'typeorm';
 import { Report } from './report.entity';
 import { AdminProfile } from './admin-profile.entity';
 import { StaffProfile } from './staff-profile.entity';
@@ -15,9 +15,6 @@ export class Task {
 
 	@Column({ type: 'uuid' })
 	assigned_by: string;
-
-	@Column({ type: 'uuid', nullable: true })
-	assigned_to: string;
 
 	@Column({ type: 'text', nullable: true })
 	task_details: string;
@@ -44,10 +41,14 @@ export class Task {
 	@JoinColumn({ name: 'assigned_by' })
 	assignedBy: AdminProfile;
 
-	// Staff member assigned to the task (references staff_profiles)
-	@ManyToOne(() => StaffProfile, (staffProfile) => staffProfile.assignedTasks)
-	@JoinColumn({ name: 'assigned_to' })
-	assignedTo: StaffProfile;
+	// Multiple staff members can be assigned to one task (many-to-many)
+	@ManyToMany(() => StaffProfile, (staffProfile) => staffProfile.assignedTasks)
+	@JoinTable({
+		name: 'task_staff_assignments',
+		joinColumn: { name: 'task_id', referencedColumnName: 'id' },
+		inverseJoinColumn: { name: 'staff_profile_id', referencedColumnName: 'id' },
+	})
+	assignedStaff: StaffProfile[];
 
 	@OneToMany(() => ReportResponse, (response) => response.task, { cascade: true })
 	responses: ReportResponse[];

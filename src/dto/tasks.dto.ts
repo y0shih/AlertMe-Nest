@@ -1,11 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsUUID, IsEnum, IsOptional, Length } from 'class-validator';
+import { IsString, IsUUID, IsEnum, IsOptional, Length, IsNumber, IsArray } from 'class-validator';
 import { TaskStatus } from '../enums/user-role.enum';
 
 export class AssignStaffDto {
-	@ApiProperty({ description: 'Staff user UUID to assign', example: 'staff-uuid' })
-	@IsUUID(4, { message: 'staff_user_id must be a valid UUID' })
-	staff_user_id: string;
+	@ApiProperty({ description: 'Staff user UUIDs to assign (array)', example: ['staff-uuid-1', 'staff-uuid-2'], type: [String] })
+	@IsUUID(4, { each: true, message: 'Each staff_user_id must be a valid UUID' })
+	staff_user_ids: string[];
 
 	@ApiProperty({ description: 'Admin UUID assigning the task', example: 'admin-uuid' })
 	@IsUUID(4, { message: 'assigned_by must be a valid UUID' })
@@ -53,10 +53,25 @@ export class AddStatusUpdateDto {
 	@Length(1, 2000, { message: 'response_text must be between 1 and 2000 characters' })
 	response_text: string;
 
-	@ApiPropertyOptional({ description: 'Optional attachment path (image)', example: '/uploads/status-updates/image.jpg' })
+	@ApiPropertyOptional({
+		description: 'Optional attachment paths (images)',
+		example: ['/uploads/status-updates/image1.jpg', '/uploads/status-updates/image2.jpg'],
+		type: [String],
+	})
 	@IsOptional()
-	@IsString({ message: 'attachment_path must be a string' })
-	attachment_path?: string;
+	@IsArray({ message: 'attachment_paths must be an array' })
+	@IsString({ each: true, message: 'Each attachment_path must be a string' })
+	attachment_paths?: string[];
+
+	@ApiPropertyOptional({ description: 'Latitude coordinate', example: 14.5995 })
+	@IsOptional()
+	@IsNumber({}, { message: 'lat must be a number' })
+	lat?: number;
+
+	@ApiPropertyOptional({ description: 'Longitude coordinate', example: 120.9842 })
+	@IsOptional()
+	@IsNumber({}, { message: 'lng must be a number' })
+	lng?: number;
 }
 
 export class CompleteTaskDto {
@@ -87,4 +102,10 @@ export class UpdateTaskStatusDto {
 	})
 	@IsEnum(TaskStatus, { message: 'status must be a valid TaskStatus' })
 	status: TaskStatus;
+}
+
+export class MarkResponseReviewedDto {
+	@ApiProperty({ description: 'Response UUID to mark as reviewed', example: 'response-uuid' })
+	@IsUUID(4, { message: 'response_id must be a valid UUID' })
+	response_id: string;
 }

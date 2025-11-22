@@ -1,7 +1,6 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToOne, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToOne } from 'typeorm';
 import { Role } from './role.entity';
 import { StaffProfile } from './staff-profile.entity';
-import { Task } from './task.entity';
 
 @Entity('staff')
 export class Staff {
@@ -38,7 +37,4 @@ export class Staff {
 
 	@OneToOne(() => StaffProfile, (profile) => profile.staff, { cascade: true })
 	profile: StaffProfile;
-
-	@OneToMany(() => Task, (task) => task.assignedTo)
-	assignedTasks: Task[];
 }

@@ -20,8 +20,17 @@ export class ReportResponse {
 	@Column({ type: 'text' })
 	response_text: string;
 
-	@Column({ type: 'varchar', nullable: true })
-	attachment_path?: string;
+	@Column({ type: 'json', nullable: true })
+	attachment_paths?: string[];
+
+	@Column({ type: 'float', nullable: true })
+	lat?: number;
+
+	@Column({ type: 'float', nullable: true })
+	lng?: number;
+
+	@Column({ type: 'boolean', default: false })
+	is_reviewed: boolean;
 
 	@Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
 	responded_at: Date;

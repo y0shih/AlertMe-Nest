@@ -1,11 +1,12 @@
 import { Controller, Get, Post, Put, Param, Body, Query, UseGuards } from '@nestjs/common';
 import { ReportsService, PaginatedReportsResponse } from './reports.service';
 import { Report } from '../../entities/report.entity';
+import { ReportResponse } from '../../entities/report-response.entity';
 import { Task } from '../../entities/task.entity';
 import { SosReport } from '../../entities/sos-report.entity';
 import { ReportStatus } from '../../enums/user-role.enum';
 import { CreateReportDto, CreateSosReportDto, ListReportsQueryDto } from '../../dto/reports.dto';
-import { AssignStaffDto, UpdateReportStatusDto } from '../../dto/tasks.dto';
+import { AssignStaffDto, UpdateReportStatusDto, MarkResponseReviewedDto } from '../../dto/tasks.dto';
 import { ApiTags, ApiOperation, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { SupabaseAuthGuard } from '../auth/supabase-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -72,7 +73,7 @@ export class ReportsController {
 	@Roles('admin', 'superadmin')
 	async assignStaff(@Param('id') reportId: string, @Body() dto: AssignStaffDto): Promise<Task> {
 		// TODO: Extract assigned_by from auth token when auth is implemented
-		return this.reportsService.assignStaff(reportId, dto.staff_user_id, dto.assigned_by, dto.task_details);
+		return this.reportsService.assignStaff(reportId, dto.staff_user_ids, dto.assigned_by, dto.task_details);
 	}
 
 	// Admin: Update report status
@@ -82,6 +83,14 @@ export class ReportsController {
 	@Roles('admin', 'superadmin')
 	async updateStatus(@Param('id') reportId: string, @Body() dto: UpdateReportStatusDto): Promise<Report> {
 		return this.reportsService.updateReportStatus(reportId, dto.status as ReportStatus);
+	}
+
+	// Admin: Mark response as reviewed
+	@Put('responses/mark-reviewed')
+	@ApiOperation({ summary: 'Mark a report response as reviewed (Admin)' })
+	@Roles('admin', 'superadmin')
+	async markResponseReviewed(@Body() dto: MarkResponseReviewedDto): Promise<ReportResponse> {
+		return this.reportsService.markResponseReviewed(dto.response_id);
 	}
 }
 
