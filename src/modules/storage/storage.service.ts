@@ -104,6 +104,38 @@ export class StorageService {
 	}
 
 	/**
+	 * List files in a folder from Supabase Storage
+	 * @param folder - Folder path (e.g., 'uploads', 'reports')
+	 * @returns List of files with their public URLs
+	 */
+	async listFiles(folder: string = 'uploads'): Promise<{ files: Array<{ publicUrl: string; createdAt: string }> }> {
+		try {
+			const { data, error } = await this.supabase.storage.from(this.bucketName).list(folder, {
+				sortBy: { column: 'created_at', order: 'desc' },
+			});
+
+			if (error) {
+				console.error('Supabase list error:', error);
+				throw new InternalServerErrorException('Failed to list files from storage');
+			}
+
+			const files = data.map((file) => {
+				const filePath = `${folder}/${file.name}`;
+				const publicUrl = this.getPublicUrl(filePath);
+				return {
+					publicUrl,
+					createdAt: file.created_at,
+				};
+			});
+
+			return { files };
+		} catch (error) {
+			console.error('List files error:', error);
+			throw new InternalServerErrorException('Failed to list files');
+		}
+	}
+
+	/**
 	 * Upload multiple files to Supabase Storage
 	 * @param files - Array of file buffers with metadata
 	 * @param folder - Optional folder path (e.g., 'reports', 'responses')
