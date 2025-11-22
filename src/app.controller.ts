@@ -11,7 +11,7 @@ export class AppController {
 	constructor(
 		private readonly appService: AppService,
 		private readonly storageService: StorageService,
-	) { }
+	) {}
 
 	@Get()
 	@ApiOperation({ summary: 'Health check' })
@@ -79,45 +79,61 @@ export class AppController {
 	@Delete('upload')
 	@ApiBearerAuth('JWT-auth')
 	@UseGuards(SupabaseAuthGuard)
-	@ApiOperation({ summary: 'Delete an image from Supabase Storage by URL' })
+	@ApiOperation({ summary: 'Delete one or multiple images from Supabase Storage by URLs' })
 	@ApiBody({
 		schema: {
 			type: 'object',
 			properties: {
-				url: {
-					type: 'string',
-					description: 'Full public URL of the image to delete',
-					example: 'https://xxx.supabase.co/storage/v1/object/public/report-attachments/uploads/abc123.jpg',
+				urls: {
+					type: 'array',
+					items: {
+						type: 'string',
+					},
+					description: 'Array of full public URLs of the images to delete',
+					example: [
+						'https://xxx.supabase.co/storage/v1/object/public/report-attachments/uploads/abc123.jpg',
+						'https://xxx.supabase.co/storage/v1/object/public/report-attachments/uploads/def456.jpg',
+					],
 				},
 			},
-			required: ['url'],
+			required: ['urls'],
 		},
 	})
-	async deleteFile(@Body('url') url: string): Promise<{ message: string }> {
-		if (!url) {
-			throw new BadRequestException('URL is required');
+	async deleteFile(@Body('urls') urls: string[]): Promise<{ message: string; deletedCount: number }> {
+		if (!urls || urls.length === 0) {
+			throw new BadRequestException('URLs array is required and cannot be empty');
 		}
 
-		// Extract the file path from the public URL
-		// URL format: https://{project}.supabase.co/storage/v1/object/public/{bucket}/{path}
-		const urlParts = url.split('/storage/v1/object/public/');
-		if (urlParts.length !== 2) {
-			throw new BadRequestException('Invalid storage URL format');
+		const filePaths: string[] = [];
+
+		// Extract file paths from all URLs
+		for (const url of urls) {
+			// Extract the file path from the public URL
+			// URL format: https://{project}.supabase.co/storage/v1/object/public/{bucket}/{path}
+			const urlParts = url.split('/storage/v1/object/public/');
+			if (urlParts.length !== 2) {
+				throw new BadRequestException(`Invalid storage URL format: ${url}`);
+			}
+
+			const pathWithBucket = urlParts[1];
+			const pathParts = pathWithBucket.split('/');
+
+			// Remove the bucket name from the path
+			if (pathParts.length < 2) {
+				throw new BadRequestException(`Invalid file path in URL: ${url}`);
+			}
+
+			pathParts.shift(); // Remove bucket name
+			const filePath = pathParts.join('/');
+			filePaths.push(filePath);
 		}
 
-		const pathWithBucket = urlParts[1];
-		const pathParts = pathWithBucket.split('/');
+		// Delete all files
+		await Promise.all(filePaths.map((filePath) => this.storageService.deleteFile(filePath)));
 
-		// Remove the bucket name from the path
-		if (pathParts.length < 2) {
-			throw new BadRequestException('Invalid file path in URL');
-		}
-
-		pathParts.shift(); // Remove bucket name
-		const filePath = pathParts.join('/');
-
-		await this.storageService.deleteFile(filePath);
-
-		return { message: 'File deleted successfully' };
+		return {
+			message: `Successfully deleted ${filePaths.length} file(s)`,
+			deletedCount: filePaths.length,
+		};
 	}
 }
