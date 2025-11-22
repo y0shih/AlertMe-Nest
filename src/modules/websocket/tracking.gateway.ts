@@ -55,7 +55,7 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 
 	handleDisconnect(client: Socket) {
 		const userId = client.data.userId;
-		console.log(`[Tracking] Client disconnected: ${userId}`);
+		Logger.log(`[Tracking] Client disconnected: ${userId}`);
 	}
 
 	/**
@@ -74,7 +74,7 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 		// Only staff and admin can join tracking
 		if (role === 'staff' || role === 'admin' || role === 'superadmin') {
 			void client.join(`report_${reportId}`);
-			console.log(`[Tracking] ${userId} joined report_${reportId}`);
+			Logger.log(`[Tracking] ${userId} joined report_${reportId}`);
 
 			// Notify others in tracking room
 			client.to(`report_${reportId}`).emit('userJoinedTracking', {
@@ -97,7 +97,7 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 		}
 
 		void client.leave(`report_${reportId}`);
-		console.log(`[Tracking] ${userId} left report_${reportId}`);
+		Logger.log(`[Tracking] ${userId} left report_${reportId}`);
 
 		// Notify others
 		client.to(`report_${reportId}`).emit('userLeftTracking', {
@@ -129,7 +129,7 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 				timestamp: new Date(),
 			});
 
-			console.log(`[Tracking] Staff ${userId} updated coordinates for report ${data.reportId}`);
+			Logger.log(`[Tracking] Staff ${userId} updated coordinates for report ${data.reportId}`);
 		}
 	}
 
@@ -152,7 +152,7 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 				reportId,
 			});
 
-			console.log(`[Tracking] Admin requested positions for report ${reportId}`);
+			Logger.log(`[Tracking] Admin requested positions for report ${reportId}`);
 		}
 	}
 }
