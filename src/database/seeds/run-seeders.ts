@@ -6,6 +6,8 @@ import { AuthUser } from '../../entities/auth-user.entity';
 import { UserProfile } from '../../entities/user-profile.entity';
 import { Admin } from '../../entities/admin.entity';
 import { AdminProfile } from '../../entities/admin-profile.entity';
+import { Staff } from '../../entities/staff.entity';
+import { StaffProfile } from '../../entities/staff-profile.entity';
 import { Report } from '../../entities/report.entity';
 import { Task } from '../../entities/task.entity';
 import { ReportResponse } from '../../entities/report-response.entity';
@@ -24,7 +26,7 @@ async function runSeeders() {
 		password: process.env.SUPABASE_DB_PASSWORD,
 		database: process.env.SUPABASE_DB_NAME || 'postgres',
 		ssl: { rejectUnauthorized: false },
-		entities: [Role, AuthUser, UserProfile, Admin, AdminProfile, Report, Task, ReportResponse, SosReport],
+		entities: [Role, AuthUser, UserProfile, Admin, AdminProfile, Staff, StaffProfile, Report, Task, ReportResponse, SosReport],
 		synchronize: false,
 		logging: true,
 	});
@@ -50,4 +52,4 @@ async function runSeeders() {
 	}
 }
 
-runSeeders();
+void runSeeders();

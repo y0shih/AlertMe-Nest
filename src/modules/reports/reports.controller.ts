@@ -10,6 +10,7 @@ import { ApiTags, ApiOperation, ApiParam, ApiBearerAuth } from '@nestjs/swagger'
 import { SupabaseAuthGuard } from '../auth/supabase-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 
 @ApiTags('Reports')
 @ApiBearerAuth('JWT-auth')
@@ -18,12 +19,19 @@ import { Roles } from '../auth/decorators/roles.decorator';
 export class ReportsController {
 	constructor(private readonly reportsService: ReportsService) {}
 
-	// Admin: List all reports with filters
+	// List all reports with filters
 	@Get()
-	@ApiOperation({ summary: 'List all reports with pagination and filters (Admin)' })
-	@Roles('admin', 'superadmin', 'staff')
+	@ApiOperation({ summary: 'List all reports with pagination and filters' })
+	@Roles('user', 'admin', 'superadmin', 'staff')
 	async list(@Query() query: ListReportsQueryDto): Promise<PaginatedReportsResponse> {
 		return this.reportsService.listReports(query);
+	}
+
+	@Get('list')
+	@ApiOperation({ summary: 'List all small-scaled reports (id, name, lat, lng, status, created_at)' })
+	@Public()
+	async listSmall(): Promise<Partial<Report>[]> {
+		return this.reportsService.listSmallReports();
 	}
 
 	// User: Get my submitted reports
@@ -64,7 +72,7 @@ export class ReportsController {
 	@Roles('admin', 'superadmin')
 	async assignStaff(@Param('id') reportId: string, @Body() dto: AssignStaffDto): Promise<Task> {
 		// TODO: Extract assigned_by from auth token when auth is implemented
-		return this.reportsService.assignStaff(reportId, dto.staff_user_id, dto.assigned_by, dto.task_details);
+		return this.reportsService.assignStaff(reportId, dto.staff_user_ids, dto.assigned_by, dto.task_details);
 	}
 
 	// Admin: Update report status

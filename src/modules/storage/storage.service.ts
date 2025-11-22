@@ -4,8 +4,12 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { randomUUID } from 'crypto';
 
 export interface UploadResult {
-	path: string;
 	publicUrl: string;
+}
+
+export interface MultipleUploadResult {
+	files: UploadResult[];
+	count: number;
 }
 
 @Injectable()
@@ -70,7 +74,6 @@ export class StorageService {
 			} = this.supabase.storage.from(this.bucketName).getPublicUrl(data.path);
 
 			return {
-				path: data.path,
 				publicUrl,
 			};
 		} catch (error) {
@@ -97,6 +100,73 @@ export class StorageService {
 		} catch (error) {
 			console.error('Delete error:', error);
 			throw new InternalServerErrorException('Failed to delete file');
+		}
+	}
+
+	/**
+	 * List files in a folder from Supabase Storage
+	 * @param folder - Folder path (e.g., 'uploads', 'reports')
+	 * @returns List of files with their public URLs
+	 */
+	async listFiles(folder: string = 'uploads'): Promise<{ files: Array<{ publicUrl: string; createdAt: string }> }> {
+		try {
+			const { data, error } = await this.supabase.storage.from(this.bucketName).list(folder, {
+				sortBy: { column: 'created_at', order: 'desc' },
+			});
+
+			if (error) {
+				console.error('Supabase list error:', error);
+				throw new InternalServerErrorException('Failed to list files from storage');
+			}
+
+			const files = data.map((file) => {
+				const filePath = `${folder}/${file.name}`;
+				const publicUrl = this.getPublicUrl(filePath);
+				return {
+					publicUrl,
+					createdAt: file.created_at,
+				};
+			});
+
+			return { files };
+		} catch (error) {
+			console.error('List files error:', error);
+			throw new InternalServerErrorException('Failed to list files');
+		}
+	}
+
+	/**
+	 * Upload multiple files to Supabase Storage
+	 * @param files - Array of file buffers with metadata
+	 * @param folder - Optional folder path (e.g., 'reports', 'responses')
+	 * @returns Upload results with paths and public URLs for all files
+	 */
+	async uploadMultipleFiles(files: Array<{ buffer: Buffer; filename: string }>, folder: string = 'uploads'): Promise<MultipleUploadResult> {
+		try {
+			if (!files || files.length === 0) {
+				throw new BadRequestException('No files provided');
+			}
+
+			// Validate total number of files (max 5 files)
+			const maxFiles = 5;
+			if (files.length > maxFiles) {
+				throw new BadRequestException(`Maximum ${maxFiles} files allowed per upload`);
+			}
+
+			const uploadPromises = files.map((file) => this.uploadFile(file.buffer, file.filename, folder));
+
+			const results = await Promise.all(uploadPromises);
+
+			return {
+				files: results,
+				count: results.length,
+			};
+		} catch (error) {
+			if (error instanceof BadRequestException) {
+				throw error;
+			}
+			console.error('Multiple upload error:', error);
+			throw new InternalServerErrorException('Failed to upload files');
 		}
 	}
 

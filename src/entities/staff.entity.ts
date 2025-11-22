@@ -1,7 +1,6 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToOne, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToOne } from 'typeorm';
 import { Role } from './role.entity';
 import { StaffProfile } from './staff-profile.entity';
-import { Task } from './task.entity';
 
 @Entity('staff')
 export class Staff {
@@ -17,6 +16,15 @@ export class Staff {
 	@Column({ type: 'uuid' })
 	role_id: string;
 
+	@Column({ type: 'boolean', default: true })
+	is_new_user: boolean;
+
+	@Column({ type: 'int', default: 0 })
+	task_given: number;
+
+	@Column({ type: 'int', default: 0 })
+	task_completed: number;
+
 	@Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
 	created_at: Date;
 
@@ -29,7 +37,4 @@ export class Staff {
 
 	@OneToOne(() => StaffProfile, (profile) => profile.staff, { cascade: true })
 	profile: StaffProfile;
-
-	@OneToMany(() => Task, (task) => task.assignedTo)
-	assignedTasks: Task[];
 }

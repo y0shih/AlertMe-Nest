@@ -80,7 +80,19 @@ export class AuthService {
 		}
 	}
 
-	async registerStaff(email: string, password: string, username: string, name: string, phone_number?: string) {
+	async registerStaff(
+		email: string,
+		password: string,
+		username: string,
+		name: string,
+		phone_number?: string,
+		address?: string,
+		city?: string,
+		state?: string,
+		postal_code?: string,
+		country?: string,
+		profilepic?: string,
+	) {
 		try {
 			// Check if staff with email already exists
 			const existingStaff = await this.staffRepository.findOne({ where: { email } });
@@ -129,16 +141,24 @@ export class AuthService {
 						email,
 						name,
 						role_id: staffRole.id,
+						task_given: 0,
+						task_completed: 0,
 					});
 					const savedStaff = await queryRunner.manager.save(staff);
 
-					// Create staff profile
+					// Create staff profile with complete information
 					const staffProfile = queryRunner.manager.create(StaffProfile, {
 						id: savedStaff.id,
 						username,
 						phone_number,
+						address,
+						city,
+						state,
+						postal_code,
+						country,
+						profilepic,
 					});
-					await queryRunner.manager.save(staffProfile);
+					const savedProfile = await queryRunner.manager.save(staffProfile);
 
 					await queryRunner.commitTransaction();
 
@@ -148,8 +168,21 @@ export class AuthService {
 							id: savedStaff.id,
 							email: savedStaff.email,
 							name: savedStaff.name,
-							username,
 							role: staffRole.name,
+							is_new_user: savedStaff.is_new_user,
+							profile: {
+								id: savedProfile.id,
+								username: savedProfile.username,
+								phone_number: savedProfile.phone_number,
+								address: savedProfile.address,
+								city: savedProfile.city,
+								state: savedProfile.state,
+								postal_code: savedProfile.postal_code,
+								country: savedProfile.country,
+								profilepic: savedProfile.profilepic,
+							},
+							task_given: savedStaff.task_given,
+							task_completed: savedStaff.task_completed,
 						},
 						requiresEmailVerification: false, // Admin created, so no email verification needed
 					};
@@ -189,6 +222,47 @@ export class AuthService {
 
 				// Get user from our database with role information
 				const user = await this.findUserByEmailHierarchy(email);
+
+				return {
+					access_token: data.session.access_token,
+					refresh_token: data.session.refresh_token,
+					user: user,
+					expires_in: data.session.expires_in,
+					expires_at: data.session.expires_at,
+				};
+			}
+
+			throw new UnauthorizedException('Login failed');
+		} catch (error) {
+			if (error instanceof UnauthorizedException) {
+				throw error;
+			}
+			throw new UnauthorizedException(error instanceof Error ? error.message : 'Login failed');
+		}
+	}
+
+	async signInAdmin(email: string, password: string) {
+		try {
+			const { data, error } = await this.supabase.auth.signInWithPassword({
+				email,
+				password,
+			});
+
+			if (error) {
+				throw new UnauthorizedException('Invalid credentials');
+			}
+
+			if (data.user && data.session) {
+				// Sync user data with our database
+				await this.syncSupabaseUser(data.user);
+
+				// Get user from our database with role information
+				const user = await this.findUserByEmailHierarchy(email);
+
+				// Ensure this account is an admin
+				if (!user || (!(user instanceof Admin) && !(user['role'] && user['role'].name === 'admin'))) {
+					throw new UnauthorizedException('Admin access required');
+				}
 
 				return {
 					access_token: data.session.access_token,
@@ -551,6 +625,13 @@ export class AuthService {
 
 			if (error) {
 				throw new BadRequestException(error.message);
+			}
+
+			// If the user is a staff member, update is_new_user to false
+			const staff = await this.staffRepository.findOne({ where: { email } });
+			if (staff && staff.is_new_user) {
+				staff.is_new_user = false;
+				await this.staffRepository.save(staff);
 			}
 
 			return {

@@ -10,8 +10,9 @@ import {
 	ResetPasswordRequestDto,
 	ResetPasswordDto,
 	UpdatePasswordDto,
-	VerifyEmailDto,
 	RegisterStaffDto,
+	ResendVerificationEmailDto,
+	SignInAdminDto,
 } from '../../dto/auth.dto';
 import { SupabaseAuthGuard } from './supabase-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
@@ -41,12 +42,52 @@ export class AuthController {
 	@UseGuards(SupabaseAuthGuard, RolesGuard)
 	@Roles('admin', 'superadmin')
 	@ApiBearerAuth('JWT-auth')
-	@ApiOperation({ summary: 'Sign up a new staff member (Admin only)' })
-	@ApiResponse({ status: 201, description: 'Staff successfully created' })
-	@ApiResponse({ status: 400, description: 'Bad request' })
-	@ApiResponse({ status: 401, description: 'Unauthorized' })
+	@ApiOperation({
+		summary: 'Register a new staff member with complete profile (Admin only)',
+		description:
+			'Creates a staff member with Supabase Auth account and complete profile information including address, contact details, and profile picture. Only required fields are email, password, username, and name. All other profile fields are optional.',
+	})
+	@ApiResponse({
+		status: 201,
+		description: 'Staff successfully created with complete profile',
+		schema: {
+			type: 'object',
+			properties: {
+				message: { type: 'string', example: 'Staff registration successful!' },
+				staff: {
+					type: 'object',
+					properties: {
+						id: { type: 'string', format: 'uuid' },
+						email: { type: 'string' },
+						name: { type: 'string' },
+						role: { type: 'string', example: 'staff' },
+						is_new_user: { type: 'boolean', example: true },
+						profile: {
+							type: 'object',
+							properties: {
+								id: { type: 'string', format: 'uuid' },
+								username: { type: 'string' },
+								phone_number: { type: 'string', nullable: true },
+								address: { type: 'string', nullable: true },
+								city: { type: 'string', nullable: true },
+								state: { type: 'string', nullable: true },
+								postal_code: { type: 'string', nullable: true },
+								country: { type: 'string', nullable: true },
+								profilepic: { type: 'string', nullable: true },
+							},
+						},
+						task_given: { type: 'number', example: 0 },
+						task_completed: { type: 'number', example: 0 },
+					},
+				},
+				requiresEmailVerification: { type: 'boolean', example: false },
+			},
+		},
+	})
+	@ApiResponse({ status: 400, description: 'Bad request - Invalid data or staff role not found' })
+	@ApiResponse({ status: 401, description: 'Unauthorized - Invalid or missing JWT token' })
 	@ApiResponse({ status: 403, description: 'Forbidden - Admin access required' })
-	@ApiResponse({ status: 409, description: 'Staff already exists' })
+	@ApiResponse({ status: 409, description: 'Conflict - Staff with this email or username already exists' })
 	async registerStaff(@Body() registerStaffDto: RegisterStaffDto) {
 		return this.authService.registerStaff(
 			registerStaffDto.email,
@@ -54,6 +95,12 @@ export class AuthController {
 			registerStaffDto.username,
 			registerStaffDto.name,
 			registerStaffDto.phone_number,
+			registerStaffDto.address,
+			registerStaffDto.city,
+			registerStaffDto.state,
+			registerStaffDto.postal_code,
+			registerStaffDto.country,
+			registerStaffDto.profilepic,
 		);
 	}
 
@@ -65,6 +112,16 @@ export class AuthController {
 	@ApiResponse({ status: 401, description: 'Unauthorized' })
 	async signIn(@Body() signInDto: SignInDto) {
 		return this.authService.signIn(signInDto.email, signInDto.password);
+	}
+
+	@Public()
+	@Post('admin/signin')
+	@HttpCode(HttpStatus.OK)
+	@ApiOperation({ summary: 'Sign in admin user' })
+	@ApiResponse({ status: 200, description: 'User successfully signed in' })
+	@ApiResponse({ status: 401, description: 'Unauthorized' })
+	async signInAdmin(@Body() signInAdminDto: SignInAdminDto) {
+		return this.authService.signInAdmin(signInAdminDto.email, signInAdminDto.password);
 	}
 
 	@Post('signout')
@@ -185,7 +242,7 @@ export class AuthController {
 	@ApiOperation({ summary: 'Resend verification email' })
 	@ApiResponse({ status: 200, description: 'Verification email sent' })
 	@ApiResponse({ status: 400, description: 'Bad request' })
-	async resendVerificationEmail(@Body() verifyEmailDto: VerifyEmailDto) {
-		return this.authService.resendVerificationEmail(verifyEmailDto.email);
+	async resendVerificationEmail(@Body() resendVerificationEmailDto: ResendVerificationEmailDto) {
+		return this.authService.resendVerificationEmail(resendVerificationEmailDto.email);
 	}
 }

@@ -36,6 +36,17 @@ export class SignInDto {
 	password: string;
 }
 
+export class SignInAdminDto {
+	@ApiProperty({ example: 'admin@example.com' })
+	@IsEmail()
+	@IsNotEmpty()
+	email: string;
+
+	@ApiProperty({ example: 'SecurePass123!' })
+	@IsString()
+	@IsNotEmpty()
+	password: string;
+}
 export class RefreshTokenDto {
 	@ApiProperty()
 	@IsString()
@@ -103,42 +114,67 @@ export class UpdatePasswordDto {
 	new_password: string;
 }
 
-export class VerifyEmailDto {
-	@ApiProperty()
-	@IsString()
-	@IsNotEmpty()
-	token: string;
-
-	@ApiProperty()
-	@IsEmail()
-	@IsNotEmpty()
-	email: string;
-}
-
 export class RegisterStaffDto {
-	@ApiProperty({ example: 'staff@example.com' })
+	@ApiProperty({ example: 'staff@example.com', description: 'Staff email address' })
 	@IsEmail()
 	@IsNotEmpty()
 	email: string;
 
-	@ApiProperty({ example: 'SecurePass123!' })
+	@ApiProperty({ example: 'SecurePass123!', description: 'Password for staff account (min 6 characters)' })
 	@IsString()
 	@MinLength(6)
 	@IsNotEmpty()
 	password: string;
 
-	@ApiProperty({ example: 'staffuser' })
+	@ApiProperty({ example: 'staffuser', description: 'Unique username for staff member' })
 	@IsString()
 	@IsNotEmpty()
 	username: string;
 
-	@ApiProperty({ example: 'John Doe' })
+	@ApiProperty({ example: 'John Doe', description: 'Full name of staff member' })
 	@IsString()
 	@IsNotEmpty()
 	name: string;
 
-	@ApiProperty({ required: false })
+	@ApiProperty({ required: false, example: '+1234567890', description: 'Contact phone number' })
 	@IsString()
 	@IsOptional()
 	phone_number?: string;
+
+	@ApiProperty({ required: false, example: '123 Main Street', description: 'Street address' })
+	@IsString()
+	@IsOptional()
+	address?: string;
+
+	@ApiProperty({ required: false, example: 'New York', description: 'City' })
+	@IsString()
+	@IsOptional()
+	city?: string;
+
+	@ApiProperty({ required: false, example: 'NY', description: 'State or province' })
+	@IsString()
+	@IsOptional()
+	state?: string;
+
+	@ApiProperty({ required: false, example: '10001', description: 'Postal/ZIP code' })
+	@IsString()
+	@IsOptional()
+	postal_code?: string;
+
+	@ApiProperty({ required: false, example: 'USA', description: 'Country' })
+	@IsString()
+	@IsOptional()
+	country?: string;
+
+	@ApiProperty({ required: false, example: 'https://example.com/avatar.jpg', description: 'Profile picture URL' })
+	@IsString()
+	@IsOptional()
+	profilepic?: string;
+}
+
+export class ResendVerificationEmailDto {
+	@ApiProperty({ example: 'user@example.com' })
+	@IsEmail()
+	@IsNotEmpty()
+	email: string;
 }

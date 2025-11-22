@@ -5,6 +5,8 @@ import { UpdateUserDto, UserQueryDto, UserResponseDto, PaginatedUserResponse } f
 import { SupabaseAuthGuard } from '../auth/supabase-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { AuthUser } from '../../entities/auth-user.entity';
 
 @ApiTags('Users')
 @ApiBearerAuth('JWT-auth')
@@ -160,7 +162,7 @@ export class UsersController {
 	})
 	@ApiResponse({
 		status: HttpStatus.BAD_REQUEST,
-		description: 'Invalid input data or validation failed',
+		description: 'Invalid input data, validation failed, or insufficient permissions',
 		schema: {
 			type: 'object',
 			properties: {
@@ -168,6 +170,8 @@ export class UsersController {
 				message: {
 					oneOf: [
 						{ type: 'string', example: 'Invalid role ID provided' },
+						{ type: 'string', example: 'Cannot modify users with equal or higher privileges' },
+						{ type: 'string', example: 'Insufficient permissions to perform this action' },
 						{ type: 'array', items: { type: 'string' }, example: ['Username must be between 3 and 50 characters'] },
 					],
 				},
@@ -201,8 +205,12 @@ export class UsersController {
 	})
 	@Put(':id')
 	@Roles('admin', 'superadmin')
-	async update(@Param('id', ParseUUIDPipe) id: string, @Body(ValidationPipe) updateUserDto: UpdateUserDto): Promise<UserResponseDto> {
-		return this.usersService.updateUser(id, updateUserDto);
+	async update(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Body(ValidationPipe) updateUserDto: UpdateUserDto,
+		@CurrentUser() currentUser: AuthUser,
+	): Promise<UserResponseDto> {
+		return this.usersService.updateUser(id, updateUserDto, currentUser.id);
 	}
 
 	@ApiOperation({
@@ -222,12 +230,18 @@ export class UsersController {
 	})
 	@ApiResponse({
 		status: HttpStatus.BAD_REQUEST,
-		description: 'Invalid user ID format',
+		description: 'Invalid user ID format or insufficient permissions',
 		schema: {
 			type: 'object',
 			properties: {
 				statusCode: { type: 'number', example: 400 },
-				message: { type: 'string', example: 'Validation failed (uuid is expected)' },
+				message: {
+					oneOf: [
+						{ type: 'string', example: 'Validation failed (uuid is expected)' },
+						{ type: 'string', example: 'Cannot modify users with equal or higher privileges' },
+						{ type: 'string', example: 'Insufficient permissions to perform this action' },
+					],
+				},
 				error: { type: 'string', example: 'Bad Request' },
 			},
 		},
@@ -247,8 +261,8 @@ export class UsersController {
 	@Delete(':id')
 	@HttpCode(HttpStatus.NO_CONTENT)
 	@Roles('admin', 'superadmin')
-	async delete(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
-		return this.usersService.deleteUser(id);
+	async delete(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() currentUser: AuthUser): Promise<void> {
+		return this.usersService.deleteUser(id, currentUser.id);
 	}
 
 	// TEMPORARY: Test endpoint for development - FIXME: Remove when auth is working
