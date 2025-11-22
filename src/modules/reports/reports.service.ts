@@ -36,7 +36,7 @@ export class ReportsService {
 		@InjectRepository(Staff)
 		private staffRepository: Repository<Staff>,
 		private readonly notificationsService: NotificationsService,
-	) { }
+	) {}
 
 	/**
 	 * Get a single report by ID with all relations
@@ -44,7 +44,7 @@ export class ReportsService {
 	async findById(id: string): Promise<Report | null> {
 		return this.reportRepository.findOne({
 			where: { id },
-			relations: ['user', 'tasks', 'tasks.assignedBy', 'tasks.assignedTo', 'responses'],
+			relations: ['user', 'tasks', 'tasks.assignedBy', 'tasks.assignedStaff', 'responses'],
 		});
 	}
 

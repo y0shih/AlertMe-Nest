@@ -17,7 +17,7 @@ import { Public } from '../auth/decorators/public.decorator';
 @UseGuards(SupabaseAuthGuard, RolesGuard)
 @Controller('reports')
 export class ReportsController {
-	constructor(private readonly reportsService: ReportsService) { }
+	constructor(private readonly reportsService: ReportsService) {}
 
 	// List all reports with filters
 	@Get()
@@ -90,7 +90,7 @@ export class ReportsController {
 @UseGuards(SupabaseAuthGuard, RolesGuard)
 @Controller('sos-reports')
 export class SosReportsController {
-	constructor(private readonly reportsService: ReportsService) { }
+	constructor(private readonly reportsService: ReportsService) {}
 
 	@Post()
 	@Roles('user', 'admin', 'superadmin')
