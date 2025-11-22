@@ -117,7 +117,7 @@ export class AuthController {
 	@Public()
 	@Post('admin/signin')
 	@HttpCode(HttpStatus.OK)
-	@ApiOperation({ summary: 'Sign in user' })
+	@ApiOperation({ summary: 'Sign in admin user' })
 	@ApiResponse({ status: 200, description: 'User successfully signed in' })
 	@ApiResponse({ status: 401, description: 'Unauthorized' })
 	async signInAdmin(@Body() signInAdminDto: SignInAdminDto) {
