@@ -334,7 +334,15 @@ export class ReportsService {
 			}
 			// Transitioning FROM completed to something else
 			else if (oldStatus === TaskStatus.COMPLETED && newStatus !== TaskStatus.COMPLETED) {
-				await Promise.all(task.assignedStaff.map((staff) => this.staffRepository.decrement({ id: staff.id }, 'task_completed', 1)));
+				// Decrement but ensure counter doesn't go below 0
+				await Promise.all(
+					task.assignedStaff.map(async (staff) => {
+						const currentStaff = await this.staffRepository.findOne({ where: { id: staff.id } });
+						if (currentStaff && currentStaff.task_completed > 0) {
+							await this.staffRepository.decrement({ id: staff.id }, 'task_completed', 1);
+						}
+					}),
+				);
 			}
 		}
 
