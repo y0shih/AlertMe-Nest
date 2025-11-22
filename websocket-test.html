@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Test Client</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1, h2 {
+            color: #333;
+        }
+        input, select, button, textarea {
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            padding: 10px 20px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button.disconnect {
+            background: #dc3545;
+        }
+        button.disconnect:hover {
+            background: #c82333;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            border-left: 3px solid #007bff;
+            background: white;
+        }
+        .log-entry.event {
+            border-left-color: #28a745;
+        }
+        .log-entry.error {
+            border-left-color: #dc3545;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        label {
+            display: block;
+            margin-top: 10px;
+            font-weight: bold;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔌 WebSocket Test Client - Repora</h1>
+    
+    <div class="container">
+        <h2>Connection</h2>
+        <label>Server URL:</label>
+        <input type="text" id="serverUrl" value="http://localhost:8000" placeholder="http://localhost:8000" style="width: 100%">
+
+        <label>Supabase JWT Token:</label>
+        <input type="text" id="token" placeholder="Enter your Supabase JWT token" style="width: 100%">
+        
+        <label>Role (for testing):</label>
+        <select id="role">
+            <option value="admin">Admin</option>
+            <option value="staff">Staff</option>
+            <option value="user">User</option>
+        </select>
+        
+        <div style="margin-top: 10px;">
+            <button onclick="connectAlerts()">Connect to /alerts</button>
+            <button onclick="connectTracking()">Connect to /tracking</button>
+            <button class="disconnect" onclick="disconnectAll()">Disconnect All</button>
+        </div>
+        
+        <div id="status" class="status disconnected">
+            Status: Disconnected
+        </div>
+    </div>
+
+    <div class="grid">
+        <div class="container">
+            <h2>📢 Alerts Namespace</h2>
+            
+            <label>Report ID:</label>
+            <input type="text" id="alertsReportId" placeholder="report-uuid">
+            
+            <div style="margin-top: 10px;">
+                <button onclick="joinAlertRoom()">Join Report Room</button>
+                <button onclick="leaveAlertRoom()">Leave Report Room</button>
+            </div>
+        </div>
+
+        <div class="container">
+            <h2>📍 Tracking Namespace</h2>
+            
+            <label>Report ID:</label>
+            <input type="text" id="trackingReportId" placeholder="report-uuid">
+            
+            <label>Latitude:</label>
+            <input type="number" id="lat" value="14.5995" step="0.0001">
+            
+            <label>Longitude:</label>
+            <input type="number" id="lng" value="120.9842" step="0.0001">
+            
+            <div style="margin-top: 10px;">
+                <button onclick="joinTrackingRoom()">Join Report Tracking</button>
+                <button onclick="sendCoordinate()">Send Coordinate</button>
+                <button onclick="leaveTrackingRoom()">Leave Tracking</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>📋 Event Log</h2>
+        <button onclick="clearLog()">Clear Log</button>
+        <div id="log" class="log"></div>
+    </div>
+
+    <script>
+        let alertsSocket = null;
+        let trackingSocket = null;
+        
+        function getServerUrl() {
+            return document.getElementById('serverUrl').value.replace(/\/$/, '');
+        }
+
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            const timestamp = new Date().toLocaleTimeString();
+            entry.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function updateStatus(connected, namespace = '') {
+            const statusDiv = document.getElementById('status');
+            if (connected) {
+                statusDiv.className = 'status connected';
+                statusDiv.textContent = `✅ Connected to ${namespace}`;
+            } else {
+                statusDiv.className = 'status disconnected';
+                statusDiv.textContent = '❌ Disconnected';
+            }
+        }
+
+        function connectAlerts() {
+            const token = document.getElementById('token').value;
+            if (!token) {
+                alert('Please enter a Supabase JWT token');
+                return;
+            }
+
+            if (alertsSocket?.connected) {
+                log('Already connected to /alerts', 'error');
+                return;
+            }
+
+            const url = getServerUrl();
+            alertsSocket = io(`${url}/alerts`, {
+                auth: { token }
+            });
+
+            alertsSocket.on('connect', () => {
+                log('✅ Connected to /alerts namespace', 'event');
+                updateStatus(true, '/alerts');
+            });
+
+            alertsSocket.on('disconnect', () => {
+                log('❌ Disconnected from /alerts', 'error');
+                updateStatus(false);
+            });
+
+            // Listen for all events
+            alertsSocket.onAny((eventName, data) => {
+                log(`🔔 <strong>${eventName}</strong>: ${JSON.stringify(data, null, 2)}`, 'event');
+            });
+        }
+
+        function connectTracking() {
+            const token = document.getElementById('token').value;
+            if (!token) {
+                alert('Please enter a Supabase JWT token');
+                return;
+            }
+
+            if (trackingSocket?.connected) {
+                log('Already connected to /tracking', 'error');
+                return;
+            }
+
+            const url = getServerUrl();
+            trackingSocket = io(`${url}/tracking`, {
+                auth: { token }
+            });
+
+            trackingSocket.on('connect', () => {
+                log('✅ Connected to /tracking namespace', 'event');
+                updateStatus(true, '/tracking');
+            });
+
+            trackingSocket.on('disconnect', () => {
+                log('❌ Disconnected from /tracking', 'error');
+                updateStatus(false);
+            });
+
+            // Listen for all events
+            trackingSocket.onAny((eventName, data) => {
+                log(`📍 <strong>${eventName}</strong>: ${JSON.stringify(data, null, 2)}`, 'event');
+            });
+        }
+
+        function disconnectAll() {
+            if (alertsSocket) {
+                alertsSocket.disconnect();
+                alertsSocket = null;
+            }
+            if (trackingSocket) {
+                trackingSocket.disconnect();
+                trackingSocket = null;
+            }
+            log('Disconnected all sockets');
+            updateStatus(false);
+        }
+
+        function joinAlertRoom() {
+            if (!alertsSocket?.connected) {
+                alert('Please connect to /alerts first');
+                return;
+            }
+            const reportId = document.getElementById('alertsReportId').value;
+            if (!reportId) {
+                alert('Please enter a Report ID');
+                return;
+            }
+            alertsSocket.emit('joinReport', reportId);
+            log(`📨 Sent: joinReport(${reportId})`);
+        }
+
+        function leaveAlertRoom() {
+            if (!alertsSocket?.connected) {
+                alert('Please connect to /alerts first');
+                return;
+            }
+            const reportId = document.getElementById('alertsReportId').value;
+            if (!reportId) {
+                alert('Please enter a Report ID');
+                return;
+            }
+            alertsSocket.emit('leaveReport', reportId);
+            log(`📨 Sent: leaveReport(${reportId})`);
+        }
+
+        function joinTrackingRoom() {
+            if (!trackingSocket?.connected) {
+                alert('Please connect to /tracking first');
+                return;
+            }
+            const reportId = document.getElementById('trackingReportId').value;
+            if (!reportId) {
+                alert('Please enter a Report ID');
+                return;
+            }
+            trackingSocket.emit('joinReport', reportId);
+            log(`📨 Sent: joinReport(${reportId})`);
+        }
+
+        function sendCoordinate() {
+            if (!trackingSocket?.connected) {
+                alert('Please connect to /tracking first');
+                return;
+            }
+            const reportId = document.getElementById('trackingReportId').value;
+            const lat = parseFloat(document.getElementById('lat').value);
+            const lng = parseFloat(document.getElementById('lng').value);
+            
+            if (!reportId) {
+                alert('Please enter a Report ID');
+                return;
+            }
+
+            trackingSocket.emit('updateCoordinate', { reportId, lat, lng });
+            log(`📨 Sent: updateCoordinate({ reportId: ${reportId}, lat: ${lat}, lng: ${lng} })`);
+        }
+
+        function leaveTrackingRoom() {
+            if (!trackingSocket?.connected) {
+                alert('Please connect to /tracking first');
+                return;
+            }
+            const reportId = document.getElementById('trackingReportId').value;
+            if (!reportId) {
+                alert('Please enter a Report ID');
+                return;
+            }
+            trackingSocket.emit('leaveReport', reportId);
+            log(`📨 Sent: leaveReport(${reportId})`);
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        // Log initial message
+        log('WebSocket Test Client Ready. Enter your Supabase JWT token and connect.');
+    </script>
+</body>
+</html>
