@@ -64,6 +64,7 @@ export class StaffController {
 	@ApiQuery({ name: 'ids', required: true, description: 'Staff UUID(s) - can pass single or multiple', type: [String], isArray: true })
 	@ApiResponse({ status: 200, description: 'Array of staff members', type: [StaffResponseDto] })
 	@ApiResponse({ status: 404, description: 'Staff member not found' })
+	@Roles('admin', 'superadmin', 'staff')
 	async findByIds(@Query('ids') ids: string | string[]): Promise<StaffResponseDto[]> {
 		const idsArray = Array.isArray(ids) ? ids : [ids];
 		return this.staffService.findMany(idsArray);
