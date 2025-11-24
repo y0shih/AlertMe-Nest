@@ -8,7 +8,6 @@ export enum UserRole {
 export enum ReportStatus {
 	PENDING = 'pending',
 	IN_PROGRESS = 'in_progress',
-	REVIEWED = 'reviewed',
 	RESOLVED = 'resolved',
 	CLOSED = 'closed',
 }

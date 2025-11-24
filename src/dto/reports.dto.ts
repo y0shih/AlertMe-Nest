@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, Length, IsNumber, Min, Max, IsEnum, IsUUID, IsDateString, IsArray } from 'class-validator';
+import { IsString, IsOptional, Length, IsNumber, Min, Max, IsEnum, IsUUID, IsDateString, IsArray, IsIn } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { ReportStatus } from '../enums/user-role.enum';
 
@@ -128,4 +128,14 @@ export class ListReportsQueryDto {
 	@IsOptional()
 	@IsUUID(4, { message: 'user_id must be a valid UUID' })
 	user_id?: string;
+
+	@ApiPropertyOptional({
+		description: 'Sort by created_at timestamp',
+		enum: ['ASC', 'DESC'],
+		default: 'DESC',
+		example: 'DESC',
+	})
+	@IsOptional()
+	@IsIn(['ASC', 'DESC'], { message: 'sort_by must be either ASC or DESC' })
+	sort_by?: 'ASC' | 'DESC' = 'DESC';
 }

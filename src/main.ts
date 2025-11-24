@@ -1,14 +1,12 @@
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, INestApplication } from '@nestjs/common';
 import { AppModule } from './app.module';
 // For Vercel we export an Express-compatible handler (req, res).
 
 let server: any;
 
-async function bootstrap() {
-	const app = await NestFactory.create(AppModule);
-
+async function configureApp(app: INestApplication) {
 	app.enableCors({
 		origin: '*',
 		methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
@@ -83,9 +81,15 @@ async function bootstrap() {
 </html>`);
 	});
 
+	return app;
+}
+
+async function bootstrap() {
+	const app = await NestFactory.create(AppModule);
+	await configureApp(app);
 	await app.init();
 	// Return the express application instance which is callable as (req, res)
-	return expressApp;
+	return app.getHttpAdapter().getInstance();
 }
 
 // If this file is executed directly (local development), bootstrap and listen.
@@ -95,10 +99,13 @@ if (typeof require !== 'undefined' && require.main === module) {
 	// Start the app and listen when executed directly (local dev).
 	void (async () => {
 		try {
-			const expressApp = await bootstrap();
+			const app = await NestFactory.create(AppModule);
+			await configureApp(app);
+
 			const port = process.env.PORT ? Number(process.env.PORT) : 3000;
 			const host = process.env.HOST || 'localhost';
-			expressApp.listen(port, () => {
+
+			await app.listen(port, () => {
 				console.log(`Local Nest server listening at http://${host}:${port}/`);
 				console.log(`Swagger UI: http://${host}:${port}/docs`);
 				console.log(`OpenAPI JSON: http://${host}:${port}/docs-json`);
