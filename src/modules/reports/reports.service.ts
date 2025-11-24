@@ -78,13 +78,14 @@ export class ReportsService {
 	async listReports(query: ListReportsQueryDto): Promise<PaginatedReportsResponse> {
 		const page = query.page ?? 1;
 		const limit = query.limit ?? 20;
+		const sortBy = query.sort_by ?? 'DESC';
 
 		const qb = this.reportRepository
 			.createQueryBuilder('report')
 			.leftJoinAndSelect('report.user', 'user')
 			.leftJoinAndSelect('report.tasks', 'tasks')
 			.leftJoinAndSelect('report.responses', 'responses')
-			.orderBy('report.created_at', 'DESC');
+			.orderBy('report.created_at', sortBy);
 
 		if (query.status !== undefined) {
 			qb.andWhere('report.status = :status', { status: query.status });
