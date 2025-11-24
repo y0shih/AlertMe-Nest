@@ -59,6 +59,11 @@ export class CreateStaffDto {
 }
 
 export class UpdateStaffDto {
+	@ApiPropertyOptional({ description: 'Staff member email address', example: 'john.doe@example.com' })
+	@IsEmail()
+	@IsOptional()
+	email?: string;
+
 	@ApiPropertyOptional({ description: 'Full name of the staff member', example: 'John Doe' })
 	@IsString()
 	@IsOptional()
@@ -118,6 +123,9 @@ export class StaffResponseDto {
 	@ApiProperty({ description: 'Role UUID', example: '123e4567-e89b-12d3-a456-426614174001' })
 	role_id: string;
 
+	@ApiProperty({ description: 'Is new user flag', example: true })
+	is_new_user: boolean;
+
 	@ApiProperty({
 		description: 'Staff member profile information',
 		example: {
@@ -144,9 +152,48 @@ export class StaffResponseDto {
 		profilepic?: string;
 	};
 
+	@ApiProperty({ description: 'Task given to staff', example: '2025-10-10T12:00:00Z' })
+	task_given: number;
+	@ApiProperty({ description: 'Task completed by staff', example: '2025-10-10T12:00:00Z' })
+	task_completed: number;
+
 	@ApiProperty({ description: 'Timestamp when the staff member was created', example: '2025-10-10T12:00:00Z' })
 	created_at: Date;
 
 	@ApiProperty({ description: 'Timestamp when the staff member was last updated', example: '2025-10-10T12:00:00Z' })
 	updated_at: Date;
+
+	@ApiPropertyOptional({
+		description: 'Tasks assigned to this staff member',
+		example: [
+			{
+				id: '123e4567-e89b-12d3-a456-426614174002',
+				report_id: '123e4567-e89b-12d3-a456-426614174003',
+				task_details: 'Investigate reported issue',
+				status: 'in_progress',
+				created_at: '2025-10-10T12:00:00Z',
+				updated_at: '2025-10-10T12:00:00Z',
+				report: {
+					id: '123e4567-e89b-12d3-a456-426614174003',
+					name: 'Broken streetlight',
+					details: 'Streetlight at Main St is not working',
+					status: 'in_progress',
+				},
+			},
+		],
+	})
+	assigned_tasks?: {
+		id: string;
+		report_id: string;
+		task_details: string;
+		status: string;
+		created_at: Date;
+		updated_at: Date;
+		report?: {
+			id: string;
+			name: string;
+			details: string;
+			status: string;
+		};
+	}[];
 }

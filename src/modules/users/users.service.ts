@@ -9,7 +9,7 @@ import { Staff } from '../../entities/staff.entity';
 import { StaffProfile } from '../../entities/staff-profile.entity';
 import { Role } from '../../entities/role.entity';
 import { AuthUserRepository } from './user.repository';
-import { CreateUserDto, UpdateUserDto, UserQueryDto, UserResponseDto, PaginatedUserResponse, UserSearchDto } from '../../dto/user.dto';
+import { UpdateUserDto, UserQueryDto, UserResponseDto, PaginatedUserResponse, UserSearchDto } from '../../dto/user.dto';
 
 @Injectable()
 export class UsersService {
@@ -54,6 +54,27 @@ export class UsersService {
 			throw new BadRequestException('User ID is required');
 		}
 
+		// Try to find in Admin table first
+		const admin = await this.adminRepository.findOne({
+			where: { id },
+			relations: ['role', 'profile'],
+		});
+
+		if (admin) {
+			return this.mapAdminToUserResponse(admin);
+		}
+
+		// Then try Staff table
+		const staff = await this.staffRepository.findOne({
+			where: { id },
+			relations: ['role', 'profile'],
+		});
+
+		if (staff) {
+			return this.mapStaffToUserResponse(staff);
+		}
+
+		// Finally try AuthUser table
 		const user = await this.authUserRepository.findOne({
 			where: { id },
 			relations: ['role', 'profile'],
@@ -71,6 +92,27 @@ export class UsersService {
 			throw new BadRequestException('Email is required');
 		}
 
+		// Try to find in Admin table first
+		const admin = await this.adminRepository.findOne({
+			where: { email },
+			relations: ['role', 'profile'],
+		});
+
+		if (admin) {
+			return this.mapAdminToUserResponse(admin);
+		}
+
+		// Then try Staff table
+		const staff = await this.staffRepository.findOne({
+			where: { email },
+			relations: ['role', 'profile'],
+		});
+
+		if (staff) {
+			return this.mapStaffToUserResponse(staff);
+		}
+
+		// Finally try AuthUser table
 		const user = await this.authUserRepository.findByEmail(email);
 
 		if (!user) {
@@ -80,94 +122,51 @@ export class UsersService {
 		return this.mapToUserResponse(user);
 	}
 
-	async createUser(createUserDto: CreateUserDto): Promise<UserResponseDto> {
-		const { email, username, role_id } = createUserDto;
-
-		// Validate role exists
-		const role = await this.roleRepository.findOne({ where: { id: role_id } });
-		if (!role) {
-			throw new BadRequestException('Invalid role ID provided');
-		}
-
-		// Route to staff tables for STAFF role
-		if (role.name === 'staff') {
-			return this.createStaffUser(email, username, role_id, role);
-		}
-
-		// Route to admin tables for admin/superadmin
-		if (role.name === 'admin' || role.name === 'superadmin') {
-			return this.createAdminUser(email, username, role_id, role);
-		}
-
-		// Regular user creation (USER role)
-		// Check if user with email already exists
-		const existingUserByEmail = await this.authUserRepository.findByEmail(email);
-		if (existingUserByEmail) {
-			throw new ConflictException('User with this email already exists');
-		}
-
-		// Check if username is already taken
-		const existingUserByUsername = await this.authUserRepository.findByUsernameOrEmail(username);
-		if (existingUserByUsername && existingUserByUsername.profile?.username === username) {
-			throw new ConflictException('Username is already taken');
-		}
-
-		// Create user with profile in a transaction
-		const queryRunner = this.authUserRepository.manager.connection.createQueryRunner();
-		await queryRunner.connect();
-		await queryRunner.startTransaction();
-
-		try {
-			// Create auth user
-			const authUser = queryRunner.manager.create(AuthUser, {
-				email,
-				role_id,
-			});
-			const savedAuthUser = await queryRunner.manager.save(authUser);
-
-			// Create user profile
-			const userProfile = queryRunner.manager.create(UserProfile, {
-				id: savedAuthUser.id, // Use same ID as auth user
-				username,
-			});
-			await queryRunner.manager.save(userProfile);
-
-			await queryRunner.commitTransaction();
-
-			// Fetch the complete user with relations
-			const createdUser = await this.authUserRepository.findOne({
-				where: { id: savedAuthUser.id },
-				relations: ['role', 'profile'],
-			});
-
-			if (!createdUser) {
-				throw new BadRequestException('Failed to retrieve created user');
-			}
-
-			return this.mapToUserResponse(createdUser);
-		} catch (error) {
-			await queryRunner.rollbackTransaction();
-			throw new BadRequestException('Failed to create user: ' + error.message);
-		} finally {
-			await queryRunner.release();
-		}
-	}
-
-	async updateUser(id: string, updateUserDto: UpdateUserDto): Promise<UserResponseDto> {
+	async updateUser(id: string, updateUserDto: UpdateUserDto, currentUserId: string): Promise<UserResponseDto> {
 		if (!id) {
 			throw new BadRequestException('User ID is required');
 		}
 
+		// Get current user (actor) information
+		const currentUser = await this.findById(currentUserId);
+
+		// Get target user information
 		const user = await this.authUserRepository.findOne({
 			where: { id },
 			relations: ['role', 'profile'],
 		});
 
 		if (!user) {
+			// Try to find in other tables
+			const admin = await this.adminRepository.findOne({
+				where: { id },
+				relations: ['role', 'profile'],
+			});
+
+			if (admin) {
+				// Check RBAC for admin users
+				this.canModifyUser(currentUser.role.name, admin.role.name, currentUserId, id);
+				throw new BadRequestException('Updating admin users is not supported through this endpoint');
+			}
+
+			const staff = await this.staffRepository.findOne({
+				where: { id },
+				relations: ['role', 'profile'],
+			});
+
+			if (staff) {
+				// Check RBAC for staff users
+				this.canModifyUser(currentUser.role.name, staff.role.name, currentUserId, id);
+				throw new BadRequestException('Updating staff users is not supported through this endpoint');
+			}
+
 			throw new NotFoundException(`User with ID ${id} not found`);
 		}
 
-		const { username, role_id } = updateUserDto;
+		// Check RBAC permissions
+		this.canModifyUser(currentUser.role.name, user.role.name, currentUserId, id);
+
+		const { username, role_id, phone_number, address, city, state, postal_code, country, profilepic } = updateUserDto;
 
 		// Check username uniqueness if provided
 		if (username && username !== user.profile?.username) {
@@ -196,15 +195,25 @@ export class UsersService {
 				await queryRunner.manager.update(AuthUser, { id }, { role_id });
 			}
 
-			// Update user profile if username changed
-			if (username && username !== user.profile?.username) {
+			// Update user profile fields
+			const profileUpdates: Partial<UserProfile> = {};
+			if (username !== undefined) profileUpdates.username = username;
+			if (phone_number !== undefined) profileUpdates.phone_number = phone_number;
+			if (address !== undefined) profileUpdates.address = address;
+			if (city !== undefined) profileUpdates.city = city;
+			if (state !== undefined) profileUpdates.state = state;
+			if (postal_code !== undefined) profileUpdates.postal_code = postal_code;
+			if (country !== undefined) profileUpdates.country = country;
+			if (profilepic !== undefined) profileUpdates.profilepic = profilepic;
+
+			if (Object.keys(profileUpdates).length > 0) {
 				if (user.profile) {
-					await queryRunner.manager.update(UserProfile, { id }, { username });
+					await queryRunner.manager.update(UserProfile, { id }, profileUpdates);
 				} else {
 					// Create profile if it doesn't exist
 					const userProfile = queryRunner.manager.create(UserProfile, {
 						id,
-						username,
+						...profileUpdates,
 					});
 					await queryRunner.manager.save(userProfile);
 				}
@@ -231,19 +240,90 @@ export class UsersService {
 		}
 	}
 
-	async deleteUser(id: string): Promise<void> {
+	async deleteUser(id: string, currentUserId: string): Promise<void> {
 		if (!id) {
 			throw new BadRequestException('User ID is required');
 		}
 
+		// Get current user (actor) information
+		const currentUser = await this.findById(currentUserId);
+
+		// Try to find in Admin table first
+		const admin = await this.adminRepository.findOne({
+			where: { id },
+			relations: ['role', 'profile'],
+		});
+
+		if (admin) {
+			// Check RBAC permissions
+			this.canModifyUser(currentUser.role.name, admin.role.name, currentUserId, id);
+			const queryRunner = this.adminRepository.manager.connection.createQueryRunner();
+			await queryRunner.connect();
+			await queryRunner.startTransaction();
+
+			try {
+				// Delete admin profile first if exists
+				if (admin.profile) {
+					await queryRunner.manager.delete(AdminProfile, { id });
+				}
+
+				// Delete admin
+				await queryRunner.manager.delete(Admin, { id });
+
+				await queryRunner.commitTransaction();
+				return;
+			} catch (error) {
+				await queryRunner.rollbackTransaction();
+				throw new BadRequestException('Failed to delete admin user: ' + error.message);
+			} finally {
+				await queryRunner.release();
+			}
+		}
+
+		// Then try Staff table
+		const staff = await this.staffRepository.findOne({
+			where: { id },
+			relations: ['role', 'profile'],
+		});
+
+		if (staff) {
+			// Check RBAC permissions
+			this.canModifyUser(currentUser.role.name, staff.role.name, currentUserId, id);
+			const queryRunner = this.staffRepository.manager.connection.createQueryRunner();
+			await queryRunner.connect();
+			await queryRunner.startTransaction();
+
+			try {
+				// Delete staff profile first if exists
+				if (staff.profile) {
+					await queryRunner.manager.delete(StaffProfile, { id });
+				}
+
+				// Delete staff
+				await queryRunner.manager.delete(Staff, { id });
+
+				await queryRunner.commitTransaction();
+				return;
+			} catch (error) {
+				await queryRunner.rollbackTransaction();
+				throw new BadRequestException('Failed to delete staff user: ' + error.message);
+			} finally {
+				await queryRunner.release();
+			}
+		}
+
+		// Finally try AuthUser table
 		const user = await this.authUserRepository.findOne({
 			where: { id },
-			relations: ['profile'],
+			relations: ['role', 'profile'],
 		});
 
 		if (!user) {
 			throw new NotFoundException(`User with ID ${id} not found`);
 		}
+
+		// Check RBAC permissions
+		this.canModifyUser(currentUser.role.name, user.role.name, currentUserId, id);
 
 		// Delete user in a transaction (cascade will handle profile deletion)
 		const queryRunner = this.authUserRepository.manager.connection.createQueryRunner();
@@ -272,127 +352,6 @@ export class UsersService {
 		const users = await this.authUserRepository.searchUsers(criteria);
 		return users.map((user) => this.mapToUserResponse(user));
 	}
-
-	/**
-	 * Create staff user in staff tables
-	 * Private helper method for STAFF role
-	 */
-	private async createStaffUser(email: string, username: string, role_id: string, role: Role): Promise<UserResponseDto> {
-		// Check if staff with email already exists
-		const existingStaff = await this.staffRepository.findOne({ where: { email } });
-		if (existingStaff) {
-			throw new ConflictException('Staff with this email already exists');
-		}
-
-		// Check if username is already taken in staff_profiles
-		const existingStaffProfile = await this.staffProfileRepository.findOne({ where: { username } });
-		if (existingStaffProfile) {
-			throw new ConflictException('Username is already taken');
-		}
-
-		// Create staff with profile in a transaction
-		const queryRunner = this.staffRepository.manager.connection.createQueryRunner();
-		await queryRunner.connect();
-		await queryRunner.startTransaction();
-
-		try {
-			// Create staff
-			const staff = queryRunner.manager.create(Staff, {
-				email,
-				name: username, // Use username as name for now
-				role_id,
-			});
-			const savedStaff = await queryRunner.manager.save(staff);
-
-			// Create staff profile
-			const staffProfile = queryRunner.manager.create(StaffProfile, {
-				id: savedStaff.id, // Use same ID as staff
-				username,
-			});
-			await queryRunner.manager.save(staffProfile);
-
-			await queryRunner.commitTransaction();
-
-			// Return response in standard format
-			return {
-				id: savedStaff.id,
-				email: savedStaff.email,
-				username,
-				role: {
-					id: role.id,
-					name: role.name,
-				},
-				created_at: savedStaff.created_at,
-				updated_at: savedStaff.updated_at,
-			};
-		} catch (error) {
-			await queryRunner.rollbackTransaction();
-			throw new BadRequestException('Failed to create staff user: ' + error.message);
-		} finally {
-			await queryRunner.release();
-		}
-	}
-
-	/**
-	 * Create admin user in admin tables
-	 * Private helper method for ADMIN/SUPERADMIN roles
-	 */
-	private async createAdminUser(email: string, username: string, role_id: string, role: Role): Promise<UserResponseDto> {
-		// Check if admin with email already exists
-		const existingAdmin = await this.adminRepository.findOne({ where: { email } });
-		if (existingAdmin) {
-			throw new ConflictException('Admin with this email already exists');
-		}
-
-		// Check if username is already taken in admin_profiles
-		const existingAdminProfile = await this.adminProfileRepository.findOne({ where: { username } });
-		if (existingAdminProfile) {
-			throw new ConflictException('Username is already taken');
-		}
-
-		// Create admin with profile in a transaction
-		const queryRunner = this.adminRepository.manager.connection.createQueryRunner();
-		await queryRunner.connect();
-		await queryRunner.startTransaction();
-
-		try {
-			// Create admin
-			const admin = queryRunner.manager.create(Admin, {
-				email,
-				name: username, // Use username as name for now
-				role_id,
-			});
-			const savedAdmin = await queryRunner.manager.save(admin);
-
-			// Create admin profile
-			const adminProfile = queryRunner.manager.create(AdminProfile, {
-				id: savedAdmin.id, // Use same ID as admin
-				username,
-			});
-			await queryRunner.manager.save(adminProfile);
-
-			await queryRunner.commitTransaction();
-
-			// Return response in standard format
-			return {
-				id: savedAdmin.id,
-				email: savedAdmin.email,
-				username,
-				role: {
-					id: role.id,
-					name: role.name,
-				},
-				created_at: savedAdmin.created_at,
-				updated_at: savedAdmin.updated_at,
-			};
-		} catch (error) {
-			await queryRunner.rollbackTransaction();
-			throw new BadRequestException('Failed to create admin user: ' + error.message);
-		} finally {
-			await queryRunner.release();
-		}
-	}
-
 	/**
 	 * Map AuthUser entity to UserResponseDto
 	 * Private helper method for consistent response formatting
@@ -406,8 +365,65 @@ export class UsersService {
 				id: user.role.id,
 				name: user.role.name,
 			},
+			phone_number: user.profile?.phone_number,
+			address: user.profile?.address,
+			city: user.profile?.city,
+			state: user.profile?.state,
+			postal_code: user.profile?.postal_code,
+			country: user.profile?.country,
+			profilepic: user.profile?.profilepic,
 			created_at: user.created_at,
 			updated_at: user.updated_at,
+		};
+	}
+
+	/**
+	 * Map Admin entity to UserResponseDto
+	 * Private helper method for consistent response formatting
+	 */
+	private mapAdminToUserResponse(admin: Admin): UserResponseDto {
+		return {
+			id: admin.id,
+			email: admin.email,
+			username: admin.profile?.username || admin.name,
+			role: {
+				id: admin.role.id,
+				name: admin.role.name,
+			},
+			phone_number: admin.profile?.phone_number,
+			address: admin.profile?.address,
+			city: admin.profile?.city,
+			state: admin.profile?.state,
+			postal_code: admin.profile?.postal_code,
+			country: admin.profile?.country,
+			profilepic: admin.profile?.profilepic,
+			created_at: admin.created_at,
+			updated_at: admin.updated_at,
+		};
+	}
+
+	/**
+	 * Map Staff entity to UserResponseDto
+	 * Private helper method for consistent response formatting
+	 */
+	private mapStaffToUserResponse(staff: Staff): UserResponseDto {
+		return {
+			id: staff.id,
+			email: staff.email,
+			username: staff.profile?.username || staff.name,
+			role: {
+				id: staff.role.id,
+				name: staff.role.name,
+			},
+			phone_number: staff.profile?.phone_number,
+			address: staff.profile?.address,
+			city: staff.profile?.city,
+			state: staff.profile?.state,
+			postal_code: staff.profile?.postal_code,
+			country: staff.profile?.country,
+			profilepic: staff.profile?.profilepic,
+			created_at: staff.created_at,
+			updated_at: staff.updated_at,
 		};
 	}
 
@@ -417,5 +433,37 @@ export class UsersService {
 	 */
 	async getAllRoles() {
 		return await this.roleRepository.find();
+	}
+
+	/**
+	 * Get role hierarchy level for RBAC checks
+	 * Higher number = higher privilege
+	 */
+	private getRoleLevel(roleName: string): number {
+		const levels: Record<string, number> = {
+			user: 1,
+			staff: 2,
+			admin: 3,
+			superadmin: 4,
+		};
+		return levels[roleName] || 0;
+	}
+
+	/**
+	 * Check if actor has permission to modify target user based on role hierarchy
+	 */
+	private canModifyUser(actorRole: string, targetRole: string, _actorId: string, _targetId: string): void {
+		const actorLevel = this.getRoleLevel(actorRole);
+		const targetLevel = this.getRoleLevel(targetRole);
+
+		// Users cannot modify anyone (including themselves) through admin endpoints
+		if (actorLevel <= 1) {
+			throw new BadRequestException('Insufficient permissions to perform this action');
+		}
+
+		// Cannot modify users with equal or higher privilege
+		if (targetLevel >= actorLevel) {
+			throw new BadRequestException('Cannot modify users with equal or higher privileges');
+		}
 	}
 }

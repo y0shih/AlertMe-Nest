@@ -22,8 +22,8 @@ export class Report {
 	})
 	status: ReportStatus;
 
-	@Column({ type: 'varchar', nullable: true })
-	attachment_path: string;
+	@Column({ type: 'json', nullable: true })
+	attachment_paths: string[];
 
 	@Column({ type: 'float' })
 	lat: number;

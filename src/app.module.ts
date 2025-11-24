@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import databaseConfig from './config/database.config';
+import supabaseConfig from './config/supabase.config';
 import { Role } from './entities/role.entity';
 import { AuthUser } from './entities/auth-user.entity';
 import { UserProfile } from './entities/user-profile.entity';
@@ -19,12 +20,14 @@ import { AuthModule } from './modules/auth/auth.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { UsersModule } from './modules/users/users.module';
 import { StaffModule } from './modules/staff/staff.module';
+import { StorageModule } from './modules/storage/storage.module';
+import { WebsocketModule } from './modules/websocket/websocket.module';
 
 @Module({
 	imports: [
 		ConfigModule.forRoot({
 			isGlobal: true,
-			load: [databaseConfig],
+			load: [databaseConfig, supabaseConfig],
 			envFilePath: '.env',
 		}),
 		TypeOrmModule.forRootAsync({
@@ -42,6 +45,8 @@ import { StaffModule } from './modules/staff/staff.module';
 		ReportsModule,
 		UsersModule,
 		StaffModule,
+		StorageModule,
+		WebsocketModule,
 	],
 	controllers: [AppController],
 	providers: [AppService],

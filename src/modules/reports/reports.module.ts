@@ -4,13 +4,16 @@ import { Report } from '../../entities/report.entity';
 import { SosReport } from '../../entities/sos-report.entity';
 import { Task } from '../../entities/task.entity';
 import { ReportResponse } from '../../entities/report-response.entity';
+import { Staff } from '../../entities/staff.entity';
 import { ReportsService } from './reports.service';
 import { ReportsController, SosReportsController } from './reports.controller';
 import { TasksController } from './tasks.controller';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { AuthModule } from '../auth/auth.module';
+import { WebsocketModule } from '../websocket/websocket.module';
 
 @Module({
-	imports: [TypeOrmModule.forFeature([Report, SosReport, Task, ReportResponse]), NotificationsModule],
+	imports: [TypeOrmModule.forFeature([Report, SosReport, Task, ReportResponse, Staff]), NotificationsModule, AuthModule, WebsocketModule],
 	controllers: [ReportsController, SosReportsController, TasksController],
 	providers: [ReportsService],
 	exports: [ReportsService],

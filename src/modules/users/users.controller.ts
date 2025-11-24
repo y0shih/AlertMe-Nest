@@ -1,10 +1,16 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, HttpStatus, HttpCode, ParseUUIDPipe, ValidationPipe } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBody } from '@nestjs/swagger';
+import { Controller, Get, Put, Delete, Body, Param, Query, HttpStatus, HttpCode, ParseUUIDPipe, ValidationPipe, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersService } from './users.service';
-import { CreateUserDto, UpdateUserDto, UserQueryDto, UserResponseDto, PaginatedUserResponse } from '../../dto/user.dto';
+import { UpdateUserDto, UserQueryDto, UserResponseDto, PaginatedUserResponse } from '../../dto/user.dto';
+import { SupabaseAuthGuard } from '../auth/supabase-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { AuthUser } from '../../entities/auth-user.entity';
 
 @ApiTags('Users')
-// @ApiBearerAuth() // Temporarily disabled for development - FIXME: Re-enable when auth is working
+@ApiBearerAuth('JWT-auth')
+@UseGuards(SupabaseAuthGuard, RolesGuard)
 @Controller('users')
 export class UsersController {
 	constructor(private readonly usersService: UsersService) {}
@@ -59,6 +65,7 @@ export class UsersController {
 		},
 	})
 	@Get()
+	@Roles('admin', 'superadmin')
 	async findAll(@Query(new ValidationPipe({ transform: true, whitelist: true })) query: UserQueryDto): Promise<PaginatedUserResponse> {
 		return this.usersService.findAll(query);
 	}
@@ -104,76 +111,9 @@ export class UsersController {
 		},
 	})
 	@Get(':id')
+	@Roles('admin', 'superadmin')
 	async findById(@Param('id', ParseUUIDPipe) id: string): Promise<UserResponseDto> {
 		return this.usersService.findById(id);
-	}
-
-	@ApiOperation({
-		summary: 'Create a new user',
-		description: 'Create a new user with email, username, and role assignment',
-	})
-	@ApiBody({
-		type: CreateUserDto,
-		description: 'User creation data',
-		examples: {
-			'standard-user': {
-				summary: 'Standard User',
-				description: 'Example of creating a standard user',
-				value: {
-					email: 'john.doe@example.com',
-					username: 'john_doe',
-					role_id: '123e4567-e89b-12d3-a456-426614174000',
-				},
-			},
-			'admin-user': {
-				summary: 'Admin User',
-				description: 'Example of creating an admin user',
-				value: {
-					email: 'admin@example.com',
-					username: 'admin_user',
-					role_id: '123e4567-e89b-12d3-a456-426614174001',
-				},
-			},
-		},
-	})
-	@ApiResponse({
-		status: HttpStatus.CREATED,
-		description: 'User created successfully',
-		type: UserResponseDto,
-	})
-	@ApiResponse({
-		status: HttpStatus.BAD_REQUEST,
-		description: 'Invalid input data or validation failed',
-		schema: {
-			type: 'object',
-			properties: {
-				statusCode: { type: 'number', example: 400 },
-				message: {
-					oneOf: [
-						{ type: 'string', example: 'Invalid role ID provided' },
-						{ type: 'array', items: { type: 'string' }, example: ['Please provide a valid email address'] },
-					],
-				},
-				error: { type: 'string', example: 'Bad Request' },
-			},
-		},
-	})
-	@ApiResponse({
-		status: HttpStatus.CONFLICT,
-		description: 'User with email or username already exists',
-		schema: {
-			type: 'object',
-			properties: {
-				statusCode: { type: 'number', example: 409 },
-				message: { type: 'string', example: 'User with this email already exists' },
-				error: { type: 'string', example: 'Conflict' },
-			},
-		},
-	})
-	@Post()
-	@HttpCode(HttpStatus.CREATED)
-	async create(@Body(ValidationPipe) createUserDto: CreateUserDto): Promise<UserResponseDto> {
-		return this.usersService.createUser(createUserDto);
 	}
 
 	@ApiOperation({
@@ -222,7 +162,7 @@ export class UsersController {
 	})
 	@ApiResponse({
 		status: HttpStatus.BAD_REQUEST,
-		description: 'Invalid input data or validation failed',
+		description: 'Invalid input data, validation failed, or insufficient permissions',
 		schema: {
 			type: 'object',
 			properties: {
@@ -230,6 +170,8 @@ export class UsersController {
 				message: {
 					oneOf: [
 						{ type: 'string', example: 'Invalid role ID provided' },
+						{ type: 'string', example: 'Cannot modify users with equal or higher privileges' },
+						{ type: 'string', example: 'Insufficient permissions to perform this action' },
 						{ type: 'array', items: { type: 'string' }, example: ['Username must be between 3 and 50 characters'] },
 					],
 				},
@@ -262,8 +204,13 @@ export class UsersController {
 		},
 	})
 	@Put(':id')
-	async update(@Param('id', ParseUUIDPipe) id: string, @Body(ValidationPipe) updateUserDto: UpdateUserDto): Promise<UserResponseDto> {
-		return this.usersService.updateUser(id, updateUserDto);
+	@Roles('admin', 'superadmin')
+	async update(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Body(ValidationPipe) updateUserDto: UpdateUserDto,
+		@CurrentUser() currentUser: AuthUser,
+	): Promise<UserResponseDto> {
+		return this.usersService.updateUser(id, updateUserDto, currentUser.id);
 	}
 
 	@ApiOperation({
@@ -283,12 +230,18 @@ export class UsersController {
 	})
 	@ApiResponse({
 		status: HttpStatus.BAD_REQUEST,
-		description: 'Invalid user ID format',
+		description: 'Invalid user ID format or insufficient permissions',
 		schema: {
 			type: 'object',
 			properties: {
 				statusCode: { type: 'number', example: 400 },
-				message: { type: 'string', example: 'Validation failed (uuid is expected)' },
+				message: {
+					oneOf: [
+						{ type: 'string', example: 'Validation failed (uuid is expected)' },
+						{ type: 'string', example: 'Cannot modify users with equal or higher privileges' },
+						{ type: 'string', example: 'Insufficient permissions to perform this action' },
+					],
+				},
 				error: { type: 'string', example: 'Bad Request' },
 			},
 		},
@@ -307,8 +260,9 @@ export class UsersController {
 	})
 	@Delete(':id')
 	@HttpCode(HttpStatus.NO_CONTENT)
-	async delete(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
-		return this.usersService.deleteUser(id);
+	@Roles('admin', 'superadmin')
+	async delete(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() currentUser: AuthUser): Promise<void> {
+		return this.usersService.deleteUser(id, currentUser.id);
 	}
 
 	// TEMPORARY: Test endpoint for development - FIXME: Remove when auth is working
@@ -331,6 +285,7 @@ export class UsersController {
 		},
 	})
 	@Get('dev/roles')
+	@Roles('admin', 'superadmin')
 	async getRoles() {
 		return this.usersService.getAllRoles();
 	}

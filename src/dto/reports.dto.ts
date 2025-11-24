@@ -1,9 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-<<<<<<< Updated upstream
-import { IsString, IsOptional, Length, IsNumber, Min, Max, IsEnum, IsUUID, IsDateString } from 'class-validator';
-=======
 import { IsString, IsOptional, Length, IsNumber, Min, Max, IsEnum, IsUUID, IsDateString, IsArray, IsIn } from 'class-validator';
->>>>>>> Stashed changes
 import { Type, Transform } from 'class-transformer';
 import { ReportStatus } from '../enums/user-role.enum';
 
@@ -19,10 +15,15 @@ export class CreateReportDto {
 	@Length(1, 2000, { message: 'details must be between 1 and 2000 characters' })
 	details: string;
 
-	@ApiPropertyOptional({ description: 'Optional attachment path', example: '/uploads/report-attachments/abc.jpg' })
+	@ApiPropertyOptional({
+		description: 'Optional array of attachment paths',
+		example: ['/uploads/report-attachments/abc.jpg', '/uploads/report-attachments/def.png'],
+		type: [String],
+	})
 	@IsOptional()
-	@IsString({ message: 'attachment_path must be a string' })
-	attachment_path?: string;
+	@IsArray({ message: 'attachment_paths must be an array' })
+	@IsString({ each: true, message: 'Each attachment path must be a string' })
+	attachment_paths?: string[];
 
 	@ApiProperty({ description: 'Latitude', example: 10.762622, minimum: -90, maximum: 90 })
 	@Type(() => Number)
@@ -62,10 +63,14 @@ export class UpdateReportDto {
 	@IsEnum(ReportStatus, { message: 'status must be a valid ReportStatus' })
 	status?: ReportStatus;
 
-	@ApiPropertyOptional({ description: 'Optional attachment path' })
+	@ApiPropertyOptional({
+		description: 'Optional array of attachment paths',
+		type: [String],
+	})
 	@IsOptional()
-	@IsString({ message: 'attachment_path must be a string' })
-	attachment_path?: string;
+	@IsArray({ message: 'attachment_paths must be an array' })
+	@IsString({ each: true, message: 'Each attachment path must be a string' })
+	attachment_paths?: string[];
 }
 
 export class CreateSosReportDto {

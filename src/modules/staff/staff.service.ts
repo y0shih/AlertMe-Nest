@@ -48,6 +48,8 @@ export class StaffService {
 				email: createStaffDto.email,
 				name: createStaffDto.name,
 				role_id: createStaffDto.role_id,
+				task_given: 0,
+				task_completed: 0,
 			});
 
 			const savedStaff = await queryRunner.manager.save(Staff, staff);
@@ -95,7 +97,7 @@ export class StaffService {
 	async findOne(id: string): Promise<StaffResponseDto> {
 		const staff = await this.staffRepository.findOne({
 			where: { id },
-			relations: ['profile', 'role'],
+			relations: ['profile', 'role', 'profile.assignedTasks', 'profile.assignedTasks.report'],
 		});
 
 		if (!staff) {
@@ -138,9 +140,27 @@ export class StaffService {
 			throw new NotFoundException('Staff member not found');
 		}
 
-		// Update staff entity if name is provided
+		// Check if email is being updated and if it already exists
+		if (updateStaffDto.email && updateStaffDto.email !== staff.email) {
+			const existingStaff = await this.staffRepository.findOne({
+				where: { email: updateStaffDto.email },
+			});
+
+			if (existingStaff) {
+				throw new ConflictException('Staff member with this email already exists');
+			}
+		}
+
+		// Update staff entity fields
+		if (updateStaffDto.email) {
+			staff.email = updateStaffDto.email;
+		}
 		if (updateStaffDto.name) {
 			staff.name = updateStaffDto.name;
+		}
+
+		// Save staff if any staff fields were updated
+		if (updateStaffDto.email || updateStaffDto.name) {
 			await this.staffRepository.save(staff);
 		}
 
@@ -162,6 +182,12 @@ export class StaffService {
 		return this.mapToResponseDto(staff, updatedProfile, staff.role);
 	}
 
+	async updateProfile(id: string, updateStaffDto: UpdateStaffDto): Promise<StaffResponseDto> {
+		// Re-use the update logic but restrict what can be updated if needed
+		// For now, it seems safe to reuse the update logic as the DTO controls the fields
+		return this.update(id, updateStaffDto);
+	}
+
 	async remove(id: string): Promise<void> {
 		const staff = await this.staffRepository.findOne({ where: { id } });
 
@@ -173,11 +199,12 @@ export class StaffService {
 	}
 
 	private mapToResponseDto(staff: Staff, profile: StaffProfile, _role: Role): StaffResponseDto {
-		return {
+		const response: any = {
 			id: staff.id,
 			email: staff.email,
 			name: staff.name,
 			role_id: staff.role_id,
+			is_new_user: staff.is_new_user,
 			profile: {
 				id: profile.id,
 				username: profile.username,
@@ -189,8 +216,32 @@ export class StaffService {
 				country: profile.country,
 				profilepic: profile.profilepic,
 			},
+			task_given: staff.task_given,
+			task_completed: staff.task_completed,
 			created_at: staff.created_at,
 			updated_at: staff.updated_at,
 		};
+
+		// Include assigned tasks if loaded
+		if (profile.assignedTasks) {
+			response.assigned_tasks = profile.assignedTasks.map((task) => ({
+				id: task.id,
+				report_id: task.report_id,
+				task_details: task.task_details,
+				status: task.status,
+				created_at: task.created_at,
+				updated_at: task.updated_at,
+				report: task.report
+					? {
+							id: task.report.id,
+							name: task.report.name,
+							details: task.report.details,
+							status: task.report.status,
+						}
+					: undefined,
+			}));
+		}
+
+		return response;
 	}
 }

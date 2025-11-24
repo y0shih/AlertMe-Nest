@@ -2,34 +2,6 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEmail, IsString, IsUUID, IsOptional, Length, IsNumber, Min, Max, IsEnum } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 
-export class CreateUserDto {
-	@ApiProperty({
-		description: 'User email address',
-		example: 'john.doe@example.com',
-		format: 'email',
-	})
-	@IsEmail({}, { message: 'Please provide a valid email address' })
-	email: string;
-
-	@ApiProperty({
-		description: 'Unique username for the user',
-		example: 'john_doe',
-		minLength: 3,
-		maxLength: 50,
-	})
-	@IsString({ message: 'Username must be a string' })
-	@Length(3, 50, { message: 'Username must be between 3 and 50 characters' })
-	username: string;
-
-	@ApiProperty({
-		description: 'Role ID for the user',
-		example: 'role-uuid',
-		format: 'uuid',
-	})
-	@IsUUID(4, { message: 'Role ID must be a valid UUID' })
-	role_id: string;
-}
-
 export class UpdateUserDto {
 	@ApiPropertyOptional({
 		description: 'Updated username for the user',
@@ -50,6 +22,62 @@ export class UpdateUserDto {
 	@IsOptional()
 	@IsUUID(4, { message: 'Role ID must be a valid UUID' })
 	role_id?: string;
+
+	@ApiPropertyOptional({
+		description: 'Phone number',
+		example: '+1234567890',
+	})
+	@IsOptional()
+	@IsString({ message: 'Phone number must be a string' })
+	phone_number?: string;
+
+	@ApiPropertyOptional({
+		description: 'Street address',
+		example: '123 Main St',
+	})
+	@IsOptional()
+	@IsString({ message: 'Address must be a string' })
+	address?: string;
+
+	@ApiPropertyOptional({
+		description: 'City',
+		example: 'New York',
+	})
+	@IsOptional()
+	@IsString({ message: 'City must be a string' })
+	city?: string;
+
+	@ApiPropertyOptional({
+		description: 'State or province',
+		example: 'NY',
+	})
+	@IsOptional()
+	@IsString({ message: 'State must be a string' })
+	state?: string;
+
+	@ApiPropertyOptional({
+		description: 'Postal code',
+		example: '10001',
+	})
+	@IsOptional()
+	@IsString({ message: 'Postal code must be a string' })
+	postal_code?: string;
+
+	@ApiPropertyOptional({
+		description: 'Country',
+		example: 'United States',
+	})
+	@IsOptional()
+	@IsString({ message: 'Country must be a string' })
+	country?: string;
+
+	@ApiPropertyOptional({
+		description: 'Profile picture URL',
+		example: 'https://example.com/profile.jpg',
+	})
+	@IsOptional()
+	@IsString({ message: 'Profile picture must be a string' })
+	profilepic?: string;
 }
 
 export class UserQueryDto {
@@ -144,6 +172,48 @@ export class UserResponseDto {
 		type: RoleResponseDto,
 	})
 	role: RoleResponseDto;
+
+	@ApiPropertyOptional({
+		description: 'Phone number',
+		example: '+1234567890',
+	})
+	phone_number?: string;
+
+	@ApiPropertyOptional({
+		description: 'Street address',
+		example: '123 Main St',
+	})
+	address?: string;
+
+	@ApiPropertyOptional({
+		description: 'City',
+		example: 'New York',
+	})
+	city?: string;
+
+	@ApiPropertyOptional({
+		description: 'State or province',
+		example: 'NY',
+	})
+	state?: string;
+
+	@ApiPropertyOptional({
+		description: 'Postal code',
+		example: '10001',
+	})
+	postal_code?: string;
+
+	@ApiPropertyOptional({
+		description: 'Country',
+		example: 'United States',
+	})
+	country?: string;
+
+	@ApiPropertyOptional({
+		description: 'Profile picture URL',
+		example: 'https://example.com/profile.jpg',
+	})
+	profilepic?: string;
 
 	@ApiProperty({
 		description: 'User creation timestamp',
