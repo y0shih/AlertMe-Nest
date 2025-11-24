@@ -9,6 +9,7 @@ import { Staff } from '../../entities/staff.entity';
 import { ReportStatus, TaskStatus } from '../../enums/user-role.enum';
 import { CreateReportDto, CreateSosReportDto, ListReportsQueryDto } from '../../dto/reports.dto';
 import { NotificationsService } from '../notifications/notifications.service';
+import { AlertsGateway } from '../websocket/alerts.gateway';
 
 export interface PaginationMetaDto {
 	page: number;
@@ -36,6 +37,7 @@ export class ReportsService {
 		@InjectRepository(Staff)
 		private staffRepository: Repository<Staff>,
 		private readonly notificationsService: NotificationsService,
+		private readonly alertsGateway: AlertsGateway,
 	) {}
 
 	/**
@@ -76,13 +78,14 @@ export class ReportsService {
 	async listReports(query: ListReportsQueryDto): Promise<PaginatedReportsResponse> {
 		const page = query.page ?? 1;
 		const limit = query.limit ?? 20;
+		const sortBy = query.sort_by ?? 'DESC';
 
 		const qb = this.reportRepository
 			.createQueryBuilder('report')
 			.leftJoinAndSelect('report.user', 'user')
 			.leftJoinAndSelect('report.tasks', 'tasks')
 			.leftJoinAndSelect('report.responses', 'responses')
-			.orderBy('report.created_at', 'DESC');
+			.orderBy('report.created_at', sortBy);
 
 		if (query.status !== undefined) {
 			qb.andWhere('report.status = :status', { status: query.status });
@@ -128,7 +131,19 @@ export class ReportsService {
 			user_id: userId,
 			status: ReportStatus.PENDING,
 		});
-		return this.reportRepository.save(report);
+		const saved = await this.reportRepository.save(report);
+
+		// Emit WebSocket event to all admins
+		this.alertsGateway.emitNewReport({
+			reportId: saved.id,
+			name: saved.name,
+			lat: saved.lat,
+			lng: saved.lng,
+			userId: saved.user_id,
+			createdAt: saved.created_at,
+		});
+
+		return saved;
 	}
 
 	/**
@@ -141,6 +156,17 @@ export class ReportsService {
 		});
 		const saved = await this.sosReportRepository.save(sos);
 		await this.notificationsService.notifySos(saved);
+
+		// Emit WebSocket event to all admins and staff
+		this.alertsGateway.emitSosAlert({
+			sosId: saved.id,
+			name: 'SOS Alert',
+			lat: saved.lat,
+			lng: saved.lng,
+			userId: saved.user_id,
+			createdAt: saved.created_at,
+		});
+
 		return saved;
 	}
 
@@ -182,6 +208,13 @@ export class ReportsService {
 			await this.reportRepository.update(reportId, { status: ReportStatus.IN_PROGRESS });
 		}
 
+		// Emit WebSocket event to assigned staff
+		this.alertsGateway.emitTaskAssigned({
+			taskId: savedTask.id,
+			reportId,
+			staffIds: staffUserIds,
+		});
+
 		return savedTask;
 	}
 
@@ -199,6 +232,26 @@ export class ReportsService {
 		if (!updatedReport) {
 			throw new Error(`Report with ID ${reportId} not found after update`);
 		}
+
+		// Emit WebSocket events for RESOLVED and CLOSED status
+		if (status === ReportStatus.RESOLVED || status === ReportStatus.CLOSED) {
+			const assignedStaffIds = updatedReport.tasks.flatMap((task) => task.assignedStaff?.map((staff) => staff.id) || []);
+
+			if (status === ReportStatus.RESOLVED) {
+				this.alertsGateway.emitReportResolved({
+					reportId,
+					userId: updatedReport.user_id,
+					assignedStaffIds,
+				});
+			} else if (status === ReportStatus.CLOSED) {
+				this.alertsGateway.emitReportClosed({
+					reportId,
+					userId: updatedReport.user_id,
+					assignedStaffIds,
+				});
+			}
+		}
+
 		return updatedReport;
 	}
 
@@ -260,6 +313,18 @@ export class ReportsService {
 
 		const savedResponse = await this.reportResponseRepository.save(response);
 
+		// Emit WebSocket event to report room
+		this.alertsGateway.emitReportResponseCreated({
+			responseId: savedResponse.id,
+			reportId,
+			taskId,
+			respondedBy: staffUserId,
+			responseText,
+			attachmentPaths,
+			lat,
+			lng,
+		});
+
 		// Auto-transition task status based on current state
 		if (task.status === TaskStatus.NOT_RECEIVED) {
 			// First update: NOT_RECEIVED -> RECEIVED (task acknowledged)
@@ -298,6 +363,13 @@ export class ReportsService {
 
 		// Increment task_completed counter for all assigned staff members
 		await Promise.all(task.assignedStaff.map((staff) => this.staffRepository.increment({ id: staff.id }, 'task_completed', 1)));
+
+		// Emit WebSocket event to admins
+		this.alertsGateway.emitTaskCompleted({
+			taskId,
+			reportId,
+			completedBy: staffUserId,
+		});
 
 		const completedTask = await this.taskRepository.findOne({
 			where: { id: taskId },

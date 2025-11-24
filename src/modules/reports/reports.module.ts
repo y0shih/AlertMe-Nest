@@ -10,9 +10,10 @@ import { ReportsController, SosReportsController } from './reports.controller';
 import { TasksController } from './tasks.controller';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { AuthModule } from '../auth/auth.module';
+import { WebsocketModule } from '../websocket/websocket.module';
 
 @Module({
-	imports: [TypeOrmModule.forFeature([Report, SosReport, Task, ReportResponse, Staff]), NotificationsModule, AuthModule],
+	imports: [TypeOrmModule.forFeature([Report, SosReport, Task, ReportResponse, Staff]), NotificationsModule, AuthModule, WebsocketModule],
 	controllers: [ReportsController, SosReportsController, TasksController],
 	providers: [ReportsService],
 	exports: [ReportsService],
