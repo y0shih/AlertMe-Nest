@@ -129,6 +129,11 @@ export class ListReportsQueryDto {
 	@IsUUID(4, { message: 'user_id must be a valid UUID' })
 	user_id?: string;
 
+	@ApiPropertyOptional({ description: 'Search for report name and username', example: 'john_doe, funny_report' })
+	@IsOptional()
+	@IsString({ message: 'Search for report name or username must be a string' })
+	search?: string;
+
 	@ApiPropertyOptional({
 		description: 'Sort by created_at timestamp',
 		enum: ['ASC', 'DESC'],

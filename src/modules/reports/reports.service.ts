@@ -38,7 +38,7 @@ export class ReportsService {
 		private staffRepository: Repository<Staff>,
 		private readonly notificationsService: NotificationsService,
 		private readonly alertsGateway: AlertsGateway,
-	) {}
+	) { }
 
 	/**
 	 * Get a single report by ID with all relations
@@ -98,6 +98,11 @@ export class ReportsService {
 		}
 		if (query.date_to) {
 			qb.andWhere('report.created_at <= :date_to', { date_to: query.date_to });
+		}
+		if (query.search) {
+			qb.andWhere('(unaccent(report.name) ILIKE unaccent(:search) OR unaccent(user.username) ILIKE unaccent(:search))', {
+				search: `%${query.search}%`,
+			});
 		}
 
 		qb.skip((page - 1) * limit).take(limit);
