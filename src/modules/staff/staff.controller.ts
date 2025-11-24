@@ -50,14 +50,24 @@ export class StaffController {
 		return this.staffService.findByRole(roleId);
 	}
 
-	@Get(':id')
-	@ApiOperation({ summary: 'Get staff member details by ID' })
-	@ApiParam({ name: 'id', description: 'Staff UUID', type: String })
-	@ApiResponse({ status: 200, description: 'Staff member details', type: StaffResponseDto })
+	@Get('query')
+	@ApiOperation({ summary: 'Get staff members by IDs (single or multiple)' })
+	@ApiQuery({ name: 'ids', required: true, description: 'Staff UUID(s) - can pass single or multiple', type: [String], isArray: true })
+	@ApiResponse({ status: 200, description: 'Array of staff members', type: [StaffResponseDto] })
 	@ApiResponse({ status: 404, description: 'Staff member not found' })
-	async findOne(@Param('id') id: string): Promise<StaffResponseDto> {
-		return this.staffService.findOne(id);
+	async findMany(@Param('id') id: string): Promise<StaffResponseDto> {
+		return this.staffService.findMany(id);
 	}
+
+	// @Get(':id')
+	// @ApiOperation({ summary: 'Get staff member details by ID' })
+	// @ApiParam({ name: 'id', description: 'Staff UUID', type: String })
+	// @ApiResponse({ status: 200, description: 'Staff member details', type: StaffResponseDto })
+	// @ApiResponse({ status: 404, description: 'Staff member not found' })
+	// @Roles('admin', 'superadmin', 'staff')
+	// async findOne(@Param('id') id: string): Promise<StaffResponseDto> {
+	// 	return this.staffService.findOne(id);
+	// }
 
 	@Put(':id')
 	@ApiOperation({ summary: 'Update staff member information (Admin)' })

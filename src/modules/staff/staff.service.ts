@@ -105,6 +105,19 @@ export class StaffService {
 		return this.mapToResponseDto(staff, staff.profile, staff.role);
 	}
 
+	async findMany(ids: string[]): Promise<StaffResponseDto[]> {
+		if (!ids || ids.length === 0) {
+			return [];
+		}
+
+		const staff = await this.staffRepository.find({
+			where: ids.map((id) => ({ id })),
+			relations: ['profile', 'role', 'profile.assignedTasks', 'profile.assignedTasks.report'],
+		});
+
+		return staff.map((s) => this.mapToResponseDto(s, s.profile, s.role));
+	}
+
 	async findByRole(roleId: string): Promise<StaffResponseDto[]> {
 		const staff = await this.staffRepository.find({
 			where: { role_id: roleId },
