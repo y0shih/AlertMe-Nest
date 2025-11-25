@@ -215,6 +215,18 @@ export class UserResponseDto {
 	})
 	profilepic?: string;
 
+	@ApiPropertyOptional({
+		description: 'Number of tasks given to staff member (only for staff role)',
+		example: 10,
+	})
+	task_given?: number;
+
+	@ApiPropertyOptional({
+		description: 'Number of tasks completed by staff member (only for staff role)',
+		example: 7,
+	})
+	task_completed?: number;
+
 	@ApiProperty({
 		description: 'User creation timestamp',
 		example: '2024-01-15T10:30:00Z',

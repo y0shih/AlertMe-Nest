@@ -30,16 +30,82 @@ export class UsersService {
 	) {}
 
 	async findAll(query: UserQueryDto): Promise<PaginatedUserResponse> {
-		const { users, total } = await this.authUserRepository.findWithPagination(query);
-
-		const userResponseData = users.map((user) => this.mapToUserResponse(user));
-
 		const page = query.page || 1;
 		const limit = query.limit || 10;
+		const skip = (page - 1) * limit;
+		const { search, role } = query;
+
+		// Build queries for all three tables
+		const allUsers: UserResponseDto[] = [];
+
+		// Query AuthUser table
+		if (!role || role === 'user') {
+			const authUserQuery = this.authUserRepository
+				.createQueryBuilder('user')
+				.leftJoinAndSelect('user.role', 'role')
+				.leftJoinAndSelect('user.profile', 'profile')
+				.where('role.name = :roleName', { roleName: 'user' });
+
+			if (search) {
+				authUserQuery.andWhere('(LOWER(profile.username) LIKE LOWER(:search) OR LOWER(user.email) LIKE LOWER(:search))', {
+					search: `%${search}%`,
+				});
+			}
+
+			const authUsers = await authUserQuery.orderBy('user.created_at', 'DESC').getMany();
+			allUsers.push(...authUsers.map((user) => this.mapToUserResponse(user)));
+		}
+
+		// Query Staff table
+		if (!role || role === 'staff') {
+			const staffQuery = this.staffRepository
+				.createQueryBuilder('staff')
+				.leftJoinAndSelect('staff.role', 'role')
+				.leftJoinAndSelect('staff.profile', 'profile')
+				.where('role.name = :roleName', { roleName: 'staff' });
+
+			if (search) {
+				staffQuery.andWhere('(LOWER(profile.username) LIKE LOWER(:search) OR LOWER(staff.email) LIKE LOWER(:search))', {
+					search: `%${search}%`,
+				});
+			}
+
+			const staffUsers = await staffQuery.orderBy('staff.created_at', 'DESC').getMany();
+			allUsers.push(...staffUsers.map((staff) => this.mapStaffToUserResponse(staff)));
+		}
+
+		// Query Admin table
+		if (!role || role === 'admin' || role === 'superadmin') {
+			const adminQuery = this.adminRepository.createQueryBuilder('admin').leftJoinAndSelect('admin.role', 'role').leftJoinAndSelect('admin.profile', 'profile');
+
+			if (role === 'admin') {
+				adminQuery.where('role.name = :roleName', { roleName: 'admin' });
+			} else if (role === 'superadmin') {
+				adminQuery.where('role.name = :roleName', { roleName: 'superadmin' });
+			} else {
+				adminQuery.where('role.name IN (:...roleNames)', { roleNames: ['admin', 'superadmin'] });
+			}
+
+			if (search) {
+				adminQuery.andWhere('(LOWER(profile.username) LIKE LOWER(:search) OR LOWER(admin.email) LIKE LOWER(:search))', {
+					search: `%${search}%`,
+				});
+			}
+
+			const adminUsers = await adminQuery.orderBy('admin.created_at', 'DESC').getMany();
+			allUsers.push(...adminUsers.map((admin) => this.mapAdminToUserResponse(admin)));
+		}
+
+		// Sort all users by created_at
+		allUsers.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+		// Get total count and apply pagination
+		const total = allUsers.length;
+		const paginatedUsers = allUsers.slice(skip, skip + limit);
 		const totalPages = Math.ceil(total / limit);
 
 		return {
-			data: userResponseData,
+			data: paginatedUsers,
 			pagination: {
 				page,
 				limit,
@@ -422,6 +488,8 @@ export class UsersService {
 			postal_code: staff.profile?.postal_code,
 			country: staff.profile?.country,
 			profilepic: staff.profile?.profilepic,
+			task_given: staff.task_given,
+			task_completed: staff.task_completed,
 			created_at: staff.created_at,
 			updated_at: staff.updated_at,
 		};
