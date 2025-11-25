@@ -167,6 +167,12 @@ export class UserResponseDto {
 	})
 	username: string;
 
+	@ApiPropertyOptional({
+		description: 'Indicates if the user is new (only for staff role)',
+		example: true,
+	})
+	is_new_user?: boolean;
+
 	@ApiProperty({
 		description: 'User role information',
 		type: RoleResponseDto,
@@ -214,6 +220,18 @@ export class UserResponseDto {
 		example: 'https://example.com/profile.jpg',
 	})
 	profilepic?: string;
+
+	@ApiPropertyOptional({
+		description: 'Number of tasks given to staff member (only for staff role)',
+		example: 10,
+	})
+	task_given?: number;
+
+	@ApiPropertyOptional({
+		description: 'Number of tasks completed by staff member (only for staff role)',
+		example: 7,
+	})
+	task_completed?: number;
 
 	@ApiProperty({
 		description: 'User creation timestamp',
