@@ -1,6 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToOne } from 'typeorm';
 import { Role } from './role.entity';
 import { StaffProfile } from './staff-profile.entity';
+import { StaffStatus } from '../enums/user-role.enum';
 
 @Entity('staff')
 export class Staff {
@@ -18,6 +19,13 @@ export class Staff {
 
 	@Column({ type: 'boolean', default: true })
 	is_new_user: boolean;
+
+	@Column({
+		type: 'enum',
+		enum: StaffStatus,
+		default: StaffStatus.ACTIVE,
+	})
+	status: StaffStatus;
 
 	@Column({ type: 'int', default: 0 })
 	task_given: number;

@@ -10,6 +10,7 @@ import { StaffProfile } from '../../entities/staff-profile.entity';
 import { Role } from '../../entities/role.entity';
 import { AuthUserRepository } from './user.repository';
 import { UpdateUserDto, UserQueryDto, UserResponseDto, PaginatedUserResponse, UserSearchDto } from '../../dto/user.dto';
+import { StaffStatus, UserStatus } from '../../enums/user-role.enum';
 
 @Injectable()
 export class UsersService {
@@ -44,7 +45,8 @@ export class UsersService {
 				.createQueryBuilder('user')
 				.leftJoinAndSelect('user.role', 'role')
 				.leftJoinAndSelect('user.profile', 'profile')
-				.where('role.name = :roleName', { roleName: 'user' });
+				.where('role.name = :roleName', { roleName: 'user' })
+				.andWhere('user.status = :status', { status: UserStatus.ACTIVE });
 
 			if (search) {
 				authUserQuery.andWhere('(LOWER(profile.username) LIKE LOWER(:search) OR LOWER(user.email) LIKE LOWER(:search))', {
@@ -62,7 +64,8 @@ export class UsersService {
 				.createQueryBuilder('staff')
 				.leftJoinAndSelect('staff.role', 'role')
 				.leftJoinAndSelect('staff.profile', 'profile')
-				.where('role.name = :roleName', { roleName: 'staff' });
+				.where('role.name = :roleName', { roleName: 'staff' })
+				.andWhere('staff.status = :status', { status: StaffStatus.ACTIVE });
 
 			if (search) {
 				staffQuery.andWhere('(LOWER(profile.username) LIKE LOWER(:search) OR LOWER(staff.email) LIKE LOWER(:search))', {
@@ -355,27 +358,10 @@ export class UsersService {
 		if (staff) {
 			// Check RBAC permissions
 			this.canModifyUser(currentUser.role.name, staff.role.name, currentUserId, id);
-			const queryRunner = this.staffRepository.manager.connection.createQueryRunner();
-			await queryRunner.connect();
-			await queryRunner.startTransaction();
-
-			try {
-				// Delete staff profile first if exists
-				if (staff.profile) {
-					await queryRunner.manager.delete(StaffProfile, { id });
-				}
-
-				// Delete staff
-				await queryRunner.manager.delete(Staff, { id });
-
-				await queryRunner.commitTransaction();
-				return;
-			} catch (error) {
-				await queryRunner.rollbackTransaction();
-				throw new BadRequestException('Failed to delete staff user: ' + error.message);
-			} finally {
-				await queryRunner.release();
-			}
+			// Soft delete: mark as inactive instead of removing
+			staff.status = StaffStatus.INACTIVE;
+			await this.staffRepository.save(staff);
+			return;
 		}
 
 		// Finally try AuthUser table
@@ -391,27 +377,9 @@ export class UsersService {
 		// Check RBAC permissions
 		this.canModifyUser(currentUser.role.name, user.role.name, currentUserId, id);
 
-		// Delete user in a transaction (cascade will handle profile deletion)
-		const queryRunner = this.authUserRepository.manager.connection.createQueryRunner();
-		await queryRunner.connect();
-		await queryRunner.startTransaction();
-
-		try {
-			// Delete user profile first if exists
-			if (user.profile) {
-				await queryRunner.manager.delete(UserProfile, { id });
-			}
-
-			// Delete auth user
-			await queryRunner.manager.delete(AuthUser, { id });
-
-			await queryRunner.commitTransaction();
-		} catch (error) {
-			await queryRunner.rollbackTransaction();
-			throw new BadRequestException('Failed to delete user: ' + error.message);
-		} finally {
-			await queryRunner.release();
-		}
+		// Soft delete: mark as inactive instead of removing
+		user.status = UserStatus.INACTIVE;
+		await this.authUserRepository.save(user);
 	}
 
 	async searchUsers(criteria: UserSearchDto): Promise<UserResponseDto[]> {

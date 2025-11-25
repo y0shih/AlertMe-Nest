@@ -10,6 +10,7 @@ import { Staff } from '../../entities/staff.entity';
 import { StaffProfile } from '../../entities/staff-profile.entity';
 import { Admin } from '../../entities/admin.entity';
 import { AdminProfile } from '../../entities/admin-profile.entity';
+import { UserStatus } from '../../enums/user-role.enum';
 
 @Injectable()
 export class AuthService {
@@ -406,6 +407,7 @@ export class AuthService {
 					email: supabaseUser.email,
 					supabase_id: supabaseUser.id,
 					role_id: userRole.id,
+					status: UserStatus.ACTIVE,
 				});
 
 				await this.authUserRepository.save(user);

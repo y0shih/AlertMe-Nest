@@ -5,6 +5,7 @@ import { Staff } from '../../entities/staff.entity';
 import { StaffProfile } from '../../entities/staff-profile.entity';
 import { Role } from '../../entities/role.entity';
 import { CreateStaffDto, UpdateStaffDto, StaffResponseDto } from '../../dto/staff.dto';
+import { StaffStatus } from '../../enums/user-role.enum';
 
 @Injectable()
 export class StaffService {
@@ -48,6 +49,7 @@ export class StaffService {
 				email: createStaffDto.email,
 				name: createStaffDto.name,
 				role_id: createStaffDto.role_id,
+				status: StaffStatus.ACTIVE,
 				task_given: 0,
 				task_completed: 0,
 			});
@@ -83,6 +85,7 @@ export class StaffService {
 
 	async findAll(page: number = 1, limit: number = 10): Promise<{ data: StaffResponseDto[]; total: number; page: number; limit: number }> {
 		const [staff, total] = await this.staffRepository.findAndCount({
+			where: { status: StaffStatus.ACTIVE },
 			relations: ['profile', 'role'],
 			skip: (page - 1) * limit,
 			take: limit,
@@ -122,7 +125,7 @@ export class StaffService {
 
 	async findByRole(roleId: string): Promise<StaffResponseDto[]> {
 		const staff = await this.staffRepository.find({
-			where: { role_id: roleId },
+			where: { role_id: roleId, status: StaffStatus.ACTIVE },
 			relations: ['profile', 'role'],
 			order: { name: 'ASC' },
 		});
@@ -195,7 +198,9 @@ export class StaffService {
 			throw new NotFoundException('Staff member not found');
 		}
 
-		await this.staffRepository.remove(staff);
+		// Soft delete: mark as inactive instead of removing
+		staff.status = StaffStatus.INACTIVE;
+		await this.staffRepository.save(staff);
 	}
 
 	private mapToResponseDto(staff: Staff, profile: StaffProfile, _role: Role): StaffResponseDto {
