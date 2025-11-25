@@ -114,7 +114,7 @@ export class UserQueryDto {
 	})
 	@IsOptional()
 	@IsString({ message: 'Search term must be a string' })
-	@Length(1, 100, { message: 'Search term must be between 1 and 100 characters' })
+	@Length(0, 100, { message: 'Search term must be between 0 and 100 characters' })
 	@Transform(({ value }) => value?.trim())
 	search?: string;
 
