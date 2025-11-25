@@ -167,24 +167,26 @@ export class AuthService {
 						staff: {
 							id: savedStaff.id,
 							email: savedStaff.email,
-							name: savedStaff.name,
-							role: staffRole.name,
+							username: savedProfile.username,
 							is_new_user: savedStaff.is_new_user,
-							profile: {
-								id: savedProfile.id,
-								username: savedProfile.username,
-								phone_number: savedProfile.phone_number,
-								address: savedProfile.address,
-								city: savedProfile.city,
-								state: savedProfile.state,
-								postal_code: savedProfile.postal_code,
-								country: savedProfile.country,
-								profilepic: savedProfile.profilepic,
+
+							role: {
+								id: staffRole.id,
+								name: staffRole.name,
 							},
+							phone_number: savedProfile.phone_number,
+							address: savedProfile.address,
+							city: savedProfile.city,
+							state: savedProfile.state,
+							postal_code: savedProfile.postal_code,
+							country: savedProfile.country,
+							profilepic: savedProfile.profilepic,
 							task_given: savedStaff.task_given,
 							task_completed: savedStaff.task_completed,
+							created_at: savedStaff.created_at,
+							updated_at: savedStaff.updated_at,
 						},
-						requiresEmailVerification: false, // Admin created, so no email verification needed
+						// requiresEmailVerification: false, // Admin created, so no email verification needed
 					};
 				} catch (dbError) {
 					await queryRunner.rollbackTransaction();

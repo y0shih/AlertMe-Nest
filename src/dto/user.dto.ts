@@ -167,6 +167,12 @@ export class UserResponseDto {
 	})
 	username: string;
 
+	@ApiPropertyOptional({
+		description: 'Indicates if the user is new (only for staff role)',
+		example: true,
+	})
+	is_new_user?: boolean;
+
 	@ApiProperty({
 		description: 'User role information',
 		type: RoleResponseDto,

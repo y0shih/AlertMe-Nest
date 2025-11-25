@@ -427,6 +427,7 @@ export class UsersService {
 			id: user.id,
 			email: user.email,
 			username: user.profile?.username || '',
+			is_new_user: undefined,
 			role: {
 				id: user.role.id,
 				name: user.role.name,
@@ -452,6 +453,7 @@ export class UsersService {
 			id: admin.id,
 			email: admin.email,
 			username: admin.profile?.username || admin.name,
+			is_new_user: undefined,
 			role: {
 				id: admin.role.id,
 				name: admin.role.name,
@@ -477,6 +479,7 @@ export class UsersService {
 			id: staff.id,
 			email: staff.email,
 			username: staff.profile?.username || staff.name,
+			is_new_user: staff.is_new_user,
 			role: {
 				id: staff.role.id,
 				name: staff.role.name,
