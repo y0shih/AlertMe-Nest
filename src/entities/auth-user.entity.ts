@@ -1,6 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToOne } from 'typeorm';
 import { Role } from './role.entity';
 import { UserProfile } from './user-profile.entity';
+import { UserStatus } from '../enums/user-role.enum';
 
 @Entity('auth_users')
 export class AuthUser {
@@ -19,6 +20,13 @@ export class AuthUser {
 
 	@Column({ type: 'uuid' })
 	role_id: string;
+
+	@Column({
+		type: 'enum',
+		enum: UserStatus,
+		default: UserStatus.ACTIVE,
+	})
+	status: UserStatus;
 
 	@Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
 	created_at: Date;

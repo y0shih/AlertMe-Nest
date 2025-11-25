@@ -19,3 +19,13 @@ export enum TaskStatus {
 	COMPLETED = 'completed',
 	CANCELLED = 'cancelled',
 }
+
+export enum StaffStatus {
+	ACTIVE = 'active',
+	INACTIVE = 'inactive',
+}
+
+export enum UserStatus {
+	ACTIVE = 'active',
+	INACTIVE = 'inactive',
+}

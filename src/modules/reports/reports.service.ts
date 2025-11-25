@@ -38,7 +38,7 @@ export class ReportsService {
 		private staffRepository: Repository<Staff>,
 		private readonly notificationsService: NotificationsService,
 		private readonly alertsGateway: AlertsGateway,
-	) { }
+	) {}
 
 	/**
 	 * Get a single report by ID with all relations
