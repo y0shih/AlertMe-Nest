@@ -10,7 +10,6 @@ import {
 import { Server, Socket } from 'socket.io';
 import { Logger, UseGuards } from '@nestjs/common';
 import { WsAuthGuard } from './websocket-auth.guard';
-import { validate as uuidValidate } from 'uuid';
 
 @UseGuards(WsAuthGuard)
 @WebSocketGateway({
@@ -26,12 +25,8 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 
 	constructor() {}
 
-	private validateReportId(reportId: any): boolean {
-		return !!(reportId && typeof reportId === 'string' && reportId.trim() !== '' && uuidValidate(reportId));
-	}
-
 	private validateCoordinateData(data: any): boolean {
-		return data && typeof data === 'object' && this.validateReportId(data.reportId) && typeof data.lat === 'number' && typeof data.lng === 'number';
+		return data && typeof data === 'object' && typeof data.lat === 'number' && typeof data.lng === 'number';
 	}
 
 	async handleConnection(client: Socket) {
@@ -50,6 +45,18 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 		if (role !== 'staff' && role !== 'admin' && role !== 'superadmin') {
 			Logger.log(`[Tracking] Unauthorized role: ${role}, disconnecting...`);
 			client.disconnect();
+			return;
+		}
+
+		// Auto-join users to their respective rooms
+		if (role === 'admin' || role === 'superadmin') {
+			void client.join('admins');
+			Logger.log(`[Tracking] ${userId} joined admins room`);
+		}
+
+		if (role === 'staff') {
+			void client.join('staff');
+			Logger.log(`[Tracking] ${userId} joined staff room`);
 		}
 	}
 
@@ -59,57 +66,10 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 	}
 
 	/**
-	 * Staff/Admin joins a report tracking room
-	 */
-	@SubscribeMessage('joinReport')
-	handleJoinReport(@ConnectedSocket() client: Socket, @MessageBody() reportId: string) {
-		const userId = client.data.userId;
-		const role = client.data.role;
-
-		if (!this.validateReportId(reportId)) {
-			Logger.log('[Tracking] Invalid reportId in joinReport');
-			return;
-		}
-
-		// Only staff and admin can join tracking
-		if (role === 'staff' || role === 'admin' || role === 'superadmin') {
-			void client.join(`report_${reportId}`);
-			Logger.log(`[Tracking] ${userId} joined report_${reportId}`);
-
-			// Notify others in tracking room
-			client.to(`report_${reportId}`).emit('userJoinedTracking', {
-				userId,
-				role,
-			});
-		}
-	}
-
-	/**
-	 * Staff/Admin leaves a report tracking room
-	 */
-	@SubscribeMessage('leaveReport')
-	handleLeaveReport(@ConnectedSocket() client: Socket, @MessageBody() reportId: string) {
-		const userId = client.data.userId;
-
-		if (!this.validateReportId(reportId)) {
-			Logger.log('[Tracking] Invalid reportId in leaveReport');
-			return;
-		}
-
-		void client.leave(`report_${reportId}`);
-		Logger.log(`[Tracking] ${userId} left report_${reportId}`);
-
-		// Notify others
-		client.to(`report_${reportId}`).emit('userLeftTracking', {
-			userId,
-		});
-	}
-
-	/**
-	 * Staff broadcasts GPS coordinates
+	 * Staff broadcasts GPS coordinates to all admins
 	 */
 	@SubscribeMessage('updateCoordinate')
-	handleUpdateCoordinate(@ConnectedSocket() client: Socket, @MessageBody() data: { reportId: string; lat: number; lng: number }) {
+	handleUpdateCoordinate(@ConnectedSocket() client: Socket, @MessageBody() data: { lat: number; lng: number }) {
 		const userId = client.data.userId;
 		const role = client.data.role;
 
@@ -120,39 +80,32 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 
 		// Only staff can broadcast coordinates
 		if (role === 'staff') {
-			// Broadcast to all in report room (other staff + admins)
-			// Note: Does NOT include report owner (user)
-			this.server.to(`report_${data.reportId}`).emit('coordinateUpdate', {
+			// Broadcast to all admins
+			this.server.to('admins').emit('coordinateUpdate', {
 				staffId: userId,
 				lat: data.lat,
 				lng: data.lng,
 				timestamp: new Date(),
 			});
 
-			Logger.log(`[Tracking] Staff ${userId} updated coordinates for report ${data.reportId}`);
+			Logger.log(`[Tracking] Staff ${userId} broadcasted coordinates to all admins`);
 		}
 	}
 
 	/**
-	 * Admin requests current positions of all staff in a report
+	 * Admin requests current positions of all staff
 	 */
-	@SubscribeMessage('requestPositions')
-	handleRequestPositions(@ConnectedSocket() client: Socket, @MessageBody() reportId: string) {
+	@SubscribeMessage('requestAllPositions')
+	handleRequestAllPositions(@ConnectedSocket() client: Socket) {
+		const userId = client.data.userId;
 		const role = client.data.role;
-
-		if (!this.validateReportId(reportId)) {
-			Logger.log('[Tracking] Invalid reportId in requestPositions');
-			return;
-		}
 
 		// Only admins can request positions
 		if (role === 'admin' || role === 'superadmin') {
-			// Broadcast request to all staff in the room
-			this.server.to(`report_${reportId}`).emit('positionRequest', {
-				reportId,
-			});
+			// Broadcast request to all staff
+			this.server.to('staff').emit('positionRequest');
 
-			Logger.log(`[Tracking] Admin requested positions for report ${reportId}`);
+			Logger.log(`[Tracking] Admin ${userId} requested all staff positions`);
 		}
 	}
 }
