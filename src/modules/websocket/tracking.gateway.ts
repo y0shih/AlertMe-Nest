@@ -8,10 +8,9 @@ import {
 	ConnectedSocket,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Logger, UseGuards } from '@nestjs/common';
+import { Logger, ExecutionContext } from '@nestjs/common';
 import { WsAuthGuard } from './websocket-auth.guard';
 
-@UseGuards(WsAuthGuard)
 @WebSocketGateway({
 	cors: {
 		origin: '*',
@@ -23,21 +22,29 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 	@WebSocketServer()
 	server: Server;
 
-	constructor() {}
+	constructor(private wsAuthGuard: WsAuthGuard) {}
 
 	private validateCoordinateData(data: any): boolean {
 		return data && typeof data === 'object' && typeof data.lat === 'number' && typeof data.lng === 'number';
 	}
 
 	async handleConnection(client: Socket) {
-		const userId = client.data.userId;
-		const role = client.data.role;
+		// Use the guard to authenticate
+		const context = {
+			switchToWs: () => ({
+				getClient: () => client,
+			}),
+		} as ExecutionContext;
 
-		if (!userId || !role) {
-			Logger.log('[Tracking] No user data, disconnecting...');
-			client.disconnect();
+		const isAuthenticated = await this.wsAuthGuard.canActivate(context);
+
+		if (!isAuthenticated) {
+			Logger.log('[Tracking] Authentication failed, client disconnected by guard');
 			return;
 		}
+
+		const userId = client.data.userId;
+		const role = client.data.role;
 
 		Logger.log(`[Tracking] Client connected: ${userId} (${role})`);
 
