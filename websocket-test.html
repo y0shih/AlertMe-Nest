@@ -3,42 +3,72 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebSocket Test Client</title>
+    <title>WebSocket Test Client - Repora</title>
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
             padding: 20px;
-            background: #f5f5f5;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .header p {
+            margin: 10px 0 0 0;
+            opacity: 0.9;
         }
         .container {
             background: white;
-            border-radius: 8px;
-            padding: 20px;
+            border-radius: 12px;
+            padding: 25px;
             margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
-        h1, h2 {
+        h2 {
             color: #333;
+            margin-top: 0;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
         }
         input, select, button, textarea {
-            padding: 10px;
+            padding: 12px;
             margin: 5px 0;
             border: 1px solid #ddd;
-            border-radius: 4px;
+            border-radius: 6px;
             font-size: 14px;
+            width: 100%;
+            box-sizing: border-box;
         }
         button {
-            background: #007bff;
+            background: #667eea;
             color: white;
             border: none;
             cursor: pointer;
-            padding: 10px 20px;
+            font-weight: 600;
+            transition: all 0.3s;
+            width: auto;
+            padding: 12px 24px;
         }
         button:hover {
-            background: #0056b3;
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
         }
         button.disconnect {
             background: #dc3545;
@@ -46,34 +76,47 @@
         button.disconnect:hover {
             background: #c82333;
         }
+        button.secondary {
+            background: #6c757d;
+        }
+        button.secondary:hover {
+            background: #5a6268;
+        }
         .status {
-            padding: 10px;
-            border-radius: 4px;
-            margin: 10px 0;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-weight: 600;
+            text-align: center;
         }
         .status.connected {
             background: #d4edda;
             color: #155724;
+            border: 2px solid #28a745;
         }
         .status.disconnected {
             background: #f8d7da;
             color: #721c24;
+            border: 2px solid #dc3545;
         }
         .log {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-            padding: 10px;
-            max-height: 400px;
+            background: #1e1e1e;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 15px;
+            max-height: 500px;
             overflow-y: auto;
             font-family: 'Courier New', monospace;
-            font-size: 12px;
+            font-size: 13px;
+            color: #d4d4d4;
         }
         .log-entry {
-            margin: 5px 0;
-            padding: 5px;
+            margin: 8px 0;
+            padding: 8px;
             border-left: 3px solid #007bff;
-            background: white;
+            background: #2d2d30;
+            border-radius: 4px;
+            line-height: 1.5;
         }
         .log-entry.event {
             border-left-color: #28a745;
@@ -81,91 +124,211 @@
         .log-entry.error {
             border-left-color: #dc3545;
         }
+        .log-entry.warning {
+            border-left-color: #ffc107;
+        }
         .grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 20px;
         }
+        @media (max-width: 968px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
         label {
             display: block;
-            margin-top: 10px;
-            font-weight: bold;
+            margin-top: 15px;
+            margin-bottom: 5px;
+            font-weight: 600;
             color: #555;
+        }
+        .help-text {
+            color: #666;
+            font-size: 13px;
+            margin: 10px 0;
+            padding: 12px;
+            background: #e7f3ff;
+            border-left: 4px solid #2196F3;
+            border-radius: 4px;
+            line-height: 1.6;
+        }
+        .help-text strong {
+            color: #1976D2;
+        }
+        code {
+            background: #f5f5f5;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            color: #d63384;
+            border: 1px solid #e0e0e0;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+        .info-box {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .info-box h3 {
+            margin: 0 0 10px 0;
+            color: #856404;
+        }
+        .info-box ul {
+            margin: 5px 0;
+            padding-left: 20px;
+        }
+        .info-box li {
+            margin: 5px 0;
+            color: #856404;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .badge.admin {
+            background: #dc3545;
+            color: white;
+        }
+        .badge.staff {
+            background: #28a745;
+            color: white;
+        }
+        .badge.user {
+            background: #6c757d;
+            color: white;
         }
     </style>
 </head>
 <body>
-    <h1>🔌 WebSocket Test Client - Repora</h1>
-    
+    <div class="header">
+        <h1>🔌 WebSocket Test Client</h1>
+        <p>Repora Real-Time Communication Testing Tool</p>
+    </div>
+
     <div class="container">
-        <h2>Connection</h2>
+        <h2>🔐 Authentication & Connection</h2>
+
         <label>Server URL:</label>
-        <input type="text" id="serverUrl" value="http://localhost:8000" placeholder="http://localhost:8000" style="width: 100%">
+        <input type="text" id="serverUrl" value="http://localhost:8000" placeholder="http://localhost:8000">
 
         <label>Supabase JWT Token:</label>
-        <input type="text" id="token" placeholder="Enter your Supabase JWT token" style="width: 100%">
-        
-        <label>Role (for testing):</label>
-        <select id="role">
-            <option value="admin">Admin</option>
-            <option value="staff">Staff</option>
-            <option value="user">User</option>
-        </select>
-        
-        <div style="margin-top: 10px;">
-            <button onclick="connectAlerts()">Connect to /alerts</button>
-            <button onclick="connectTracking()">Connect to /tracking</button>
-            <button class="disconnect" onclick="disconnectAll()">Disconnect All</button>
+        <input type="text" id="token" placeholder="Paste your Supabase JWT access token here">
+
+        <div class="help-text">
+            <strong>📖 How to get a valid token:</strong><br>
+            1. Send a POST request to <code>/auth/login</code> with your credentials<br>
+            2. Copy the <code>access_token</code> from the response<br>
+            3. Paste it in the field above<br><br>
+            <strong>Example using curl:</strong><br>
+            <code>curl -X POST http://localhost:8000/auth/login -H "Content-Type: application/json" -d '{"email":"user@example.com","password":"password"}'</code>
         </div>
-        
+
+        <div class="button-group">
+            <button onclick="connectAlerts()">📢 Connect to /alerts</button>
+            <button onclick="connectTracking()">📍 Connect to /tracking</button>
+            <button class="disconnect" onclick="disconnectAll()">❌ Disconnect All</button>
+        </div>
+
         <div id="status" class="status disconnected">
-            Status: Disconnected
+            ⚫ Status: Disconnected
         </div>
     </div>
 
     <div class="grid">
         <div class="container">
             <h2>📢 Alerts Namespace</h2>
-            
-            <label>Report ID:</label>
-            <input type="text" id="alertsReportId" placeholder="report-uuid">
-            
-            <div style="margin-top: 10px;">
-                <button onclick="joinAlertRoom()">Join Report Room</button>
-                <button onclick="leaveAlertRoom()">Leave Report Room</button>
+
+            <div class="info-box">
+                <h3>ℹ️ About Alerts</h3>
+                <ul>
+                    <li><strong>Purpose:</strong> Receive notifications about new reports and SOS alerts</li>
+                    <li><strong>Access:</strong> All authenticated users</li>
+                    <li><strong>Auto-joined rooms:</strong></li>
+                    <ul>
+                        <li><code>everyone</code> - All users (receives <code>newReport</code> events)</li>
+                        <li><code>staff_and_admins</code> - Staff/Admin/Superadmin only (receives <code>sosAlert</code> events)</li>
+                    </ul>
+                </ul>
+            </div>
+
+            <div class="help-text">
+                <strong>Events you'll receive:</strong><br>
+                • <code>newReport</code> - New report created (sent to everyone)<br>
+                • <code>sosAlert</code> - SOS emergency alert (staff/admin only)
+            </div>
+
+            <div id="alertsStatus" style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 6px; display: none;">
+                <strong>Connected as:</strong> <span id="alertsUser"></span> <span id="alertsRole"></span><br>
+                <strong>Rooms:</strong> <span id="alertsRooms"></span>
             </div>
         </div>
 
         <div class="container">
             <h2>📍 Tracking Namespace</h2>
-            
-            <label>Report ID:</label>
-            <input type="text" id="trackingReportId" placeholder="report-uuid">
-            
+
+            <div class="info-box">
+                <h3>ℹ️ About Tracking</h3>
+                <ul>
+                    <li><strong>Purpose:</strong> Real-time GPS coordinate sharing</li>
+                    <li><strong>Access:</strong> Staff, Admin, Superadmin only</li>
+                    <li><strong>Auto-joined rooms:</strong></li>
+                    <ul>
+                        <li><code>staff</code> - Staff members (send coordinates)</li>
+                        <li><code>admins</code> - Admins (receive coordinates)</li>
+                    </ul>
+                </ul>
+            </div>
+
             <label>Latitude:</label>
-            <input type="number" id="lat" value="14.5995" step="0.0001">
-            
+            <input type="number" id="lat" value="14.5995" step="0.0001" placeholder="14.5995">
+
             <label>Longitude:</label>
-            <input type="number" id="lng" value="120.9842" step="0.0001">
-            
-            <div style="margin-top: 10px;">
-                <button onclick="joinTrackingRoom()">Join Report Tracking</button>
-                <button onclick="sendCoordinate()">Send Coordinate</button>
-                <button onclick="leaveTrackingRoom()">Leave Tracking</button>
+            <input type="number" id="lng" value="120.9842" step="0.0001" placeholder="120.9842">
+
+            <div class="button-group">
+                <button id="sendCoordBtn" onclick="sendCoordinate()" disabled>📍 Send Coordinate (Staff)</button>
+                <button id="requestPosBtn" onclick="requestPositions()" disabled>🗺️ Request All Positions (Admin)</button>
+            </div>
+
+            <div class="help-text">
+                <strong>Staff Actions:</strong> Send GPS coordinates to all admins<br>
+                <strong>Admin Actions:</strong> Request position updates from all staff
+            </div>
+
+            <div id="trackingStatus" style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 6px; display: none;">
+                <strong>Connected as:</strong> <span id="trackingUser"></span> <span id="trackingRole"></span><br>
+                <strong>Rooms:</strong> <span id="trackingRooms"></span>
             </div>
         </div>
     </div>
 
     <div class="container">
         <h2>📋 Event Log</h2>
-        <button onclick="clearLog()">Clear Log</button>
+        <div class="button-group">
+            <button class="secondary" onclick="clearLog()">🗑️ Clear Log</button>
+            <button class="secondary" onclick="exportLog()">💾 Export Log</button>
+        </div>
         <div id="log" class="log"></div>
     </div>
 
     <script>
         let alertsSocket = null;
         let trackingSocket = null;
-        
+        let currentUser = { alerts: null, tracking: null };
+
         function getServerUrl() {
             return document.getElementById('serverUrl').value.replace(/\/$/, '');
         }
@@ -185,75 +348,148 @@
             if (connected) {
                 statusDiv.className = 'status connected';
                 statusDiv.textContent = `✅ Connected to ${namespace}`;
+            } else if (alertsSocket?.connected || trackingSocket?.connected) {
+                const active = [];
+                if (alertsSocket?.connected) active.push('/alerts');
+                if (trackingSocket?.connected) active.push('/tracking');
+                statusDiv.className = 'status connected';
+                statusDiv.textContent = `✅ Connected to: ${active.join(', ')}`;
             } else {
                 statusDiv.className = 'status disconnected';
-                statusDiv.textContent = '❌ Disconnected';
+                statusDiv.textContent = '⚫ Disconnected';
             }
         }
 
+        function getRoleBadge(role) {
+            return `<span class="badge ${role}">${role}</span>`;
+        }
+
         function connectAlerts() {
-            const token = document.getElementById('token').value;
+            const token = document.getElementById('token').value.trim();
             if (!token) {
-                alert('Please enter a Supabase JWT token');
+                alert('⚠️ Please enter a Supabase JWT token');
+                log('❌ Cannot connect: No token provided', 'error');
                 return;
             }
 
             if (alertsSocket?.connected) {
-                log('Already connected to /alerts', 'error');
+                log('⚠️ Already connected to /alerts', 'warning');
                 return;
             }
 
             const url = getServerUrl();
+            log(`📡 Attempting to connect to ${url}/alerts...`);
+
             alertsSocket = io(`${url}/alerts`, {
-                auth: { token }
+                auth: { token },
+                transports: ['websocket', 'polling']
             });
 
             alertsSocket.on('connect', () => {
-                log('✅ Connected to /alerts namespace', 'event');
+                log('✅ <strong>Successfully connected to /alerts namespace</strong>', 'event');
                 updateStatus(true, '/alerts');
+                document.getElementById('alertsStatus').style.display = 'block';
             });
 
-            alertsSocket.on('disconnect', () => {
-                log('❌ Disconnected from /alerts', 'error');
+            alertsSocket.on('disconnect', (reason) => {
+                log(`❌ <strong>Disconnected from /alerts</strong> - Reason: <code>${reason}</code>`, 'error');
                 updateStatus(false);
+                document.getElementById('alertsStatus').style.display = 'none';
+
+                if (reason === 'io server disconnect') {
+                    log('💡 Server disconnected you. Possible reasons: Invalid token, authentication failed, or unauthorized access', 'warning');
+                }
             });
 
-            // Listen for all events
+            alertsSocket.on('connect_error', (error) => {
+                log(`❌ <strong>Connection error on /alerts:</strong> ${error.message}`, 'error');
+                if (error.message.includes('xhr poll error')) {
+                    log('💡 Hint: Make sure the server is running at the correct URL', 'warning');
+                } else if (error.message.includes('websocket error')) {
+                    log('💡 Hint: Check if WebSocket connections are allowed through your firewall', 'warning');
+                }
+            });
+
+            // Listen for server events
+            alertsSocket.on('newReport', (data) => {
+                log(`🔔 <strong>NEW REPORT:</strong> ${JSON.stringify(data, null, 2)}`, 'event');
+            });
+
+            alertsSocket.on('sosAlert', (data) => {
+                log(`🚨 <strong>SOS ALERT:</strong> ${JSON.stringify(data, null, 2)}`, 'event');
+            });
+
+            // Catch-all for any other events
             alertsSocket.onAny((eventName, data) => {
-                log(`🔔 <strong>${eventName}</strong>: ${JSON.stringify(data, null, 2)}`, 'event');
+                if (eventName !== 'connect' && eventName !== 'disconnect' && eventName !== 'newReport' && eventName !== 'sosAlert') {
+                    log(`📢 [ALERTS] <strong>${eventName}:</strong> ${JSON.stringify(data, null, 2)}`, 'event');
+                }
             });
         }
 
         function connectTracking() {
-            const token = document.getElementById('token').value;
+            const token = document.getElementById('token').value.trim();
             if (!token) {
-                alert('Please enter a Supabase JWT token');
+                alert('⚠️ Please enter a Supabase JWT token');
+                log('❌ Cannot connect: No token provided', 'error');
                 return;
             }
 
             if (trackingSocket?.connected) {
-                log('Already connected to /tracking', 'error');
+                log('⚠️ Already connected to /tracking', 'warning');
                 return;
             }
 
             const url = getServerUrl();
+            log(`📡 Attempting to connect to ${url}/tracking...`);
+
             trackingSocket = io(`${url}/tracking`, {
-                auth: { token }
+                auth: { token },
+                transports: ['websocket', 'polling']
             });
 
             trackingSocket.on('connect', () => {
-                log('✅ Connected to /tracking namespace', 'event');
+                log('✅ <strong>Successfully connected to /tracking namespace</strong>', 'event');
                 updateStatus(true, '/tracking');
+                document.getElementById('trackingStatus').style.display = 'block';
+                document.getElementById('sendCoordBtn').disabled = false;
+                document.getElementById('requestPosBtn').disabled = false;
             });
 
-            trackingSocket.on('disconnect', () => {
-                log('❌ Disconnected from /tracking', 'error');
+            trackingSocket.on('disconnect', (reason) => {
+                log(`❌ <strong>Disconnected from /tracking</strong> - Reason: <code>${reason}</code>`, 'error');
                 updateStatus(false);
+                document.getElementById('trackingStatus').style.display = 'none';
+                document.getElementById('sendCoordBtn').disabled = true;
+                document.getElementById('requestPosBtn').disabled = true;
+
+                if (reason === 'io server disconnect') {
+                    log('💡 Server disconnected you. Possible reasons: Invalid token, unauthorized role (tracking requires staff/admin/superadmin)', 'warning');
+                }
             });
 
-            // Listen for all events
+            trackingSocket.on('connect_error', (error) => {
+                log(`❌ <strong>Connection error on /tracking:</strong> ${error.message}`, 'error');
+                if (error.message.includes('xhr poll error')) {
+                    log('💡 Hint: Make sure the server is running at the correct URL', 'warning');
+                }
+            });
+
+            // Listen for coordinate updates (admins receive these from staff)
+            trackingSocket.on('coordinateUpdate', (data) => {
+                log(`📍 <strong>COORDINATE UPDATE:</strong> Staff ${data.staffId} is at [${data.lat}, ${data.lng}]`, 'event');
+            });
+
+            // Listen for position requests (staff receive these from admins)
+            trackingSocket.on('positionRequest', () => {
+                log(`🗺️ <strong>POSITION REQUEST:</strong> Admin requested all staff positions`, 'event');
+            });
+
+            // Catch-all for any other events
             trackingSocket.onAny((eventName, data) => {
-                log(`📍 <strong>${eventName}</strong>: ${JSON.stringify(data, null, 2)}`, 'event');
+                if (eventName !== 'connect' && eventName !== 'disconnect' && eventName !== 'coordinateUpdate' && eventName !== 'positionRequest') {
+                    log(`📍 [TRACKING] <strong>${eventName}:</strong> ${JSON.stringify(data, null, 2)}`, 'event');
+                }
             });
         }
 
@@ -261,95 +497,84 @@
             if (alertsSocket) {
                 alertsSocket.disconnect();
                 alertsSocket = null;
+                log('🔌 Disconnected from /alerts');
             }
             if (trackingSocket) {
                 trackingSocket.disconnect();
                 trackingSocket = null;
+                log('🔌 Disconnected from /tracking');
             }
-            log('Disconnected all sockets');
             updateStatus(false);
-        }
-
-        function joinAlertRoom() {
-            if (!alertsSocket?.connected) {
-                alert('Please connect to /alerts first');
-                return;
-            }
-            const reportId = document.getElementById('alertsReportId').value;
-            if (!reportId) {
-                alert('Please enter a Report ID');
-                return;
-            }
-            alertsSocket.emit('joinReport', reportId);
-            log(`📨 Sent: joinReport(${reportId})`);
-        }
-
-        function leaveAlertRoom() {
-            if (!alertsSocket?.connected) {
-                alert('Please connect to /alerts first');
-                return;
-            }
-            const reportId = document.getElementById('alertsReportId').value;
-            if (!reportId) {
-                alert('Please enter a Report ID');
-                return;
-            }
-            alertsSocket.emit('leaveReport', reportId);
-            log(`📨 Sent: leaveReport(${reportId})`);
-        }
-
-        function joinTrackingRoom() {
-            if (!trackingSocket?.connected) {
-                alert('Please connect to /tracking first');
-                return;
-            }
-            const reportId = document.getElementById('trackingReportId').value;
-            if (!reportId) {
-                alert('Please enter a Report ID');
-                return;
-            }
-            trackingSocket.emit('joinReport', reportId);
-            log(`📨 Sent: joinReport(${reportId})`);
+            document.getElementById('alertsStatus').style.display = 'none';
+            document.getElementById('trackingStatus').style.display = 'none';
+            document.getElementById('sendCoordBtn').disabled = true;
+            document.getElementById('requestPosBtn').disabled = true;
         }
 
         function sendCoordinate() {
             if (!trackingSocket?.connected) {
-                alert('Please connect to /tracking first');
+                alert('⚠️ Please connect to /tracking first');
+                log('❌ Cannot send coordinate: Not connected to /tracking', 'error');
                 return;
             }
-            const reportId = document.getElementById('trackingReportId').value;
+
             const lat = parseFloat(document.getElementById('lat').value);
             const lng = parseFloat(document.getElementById('lng').value);
-            
-            if (!reportId) {
-                alert('Please enter a Report ID');
+
+            if (isNaN(lat) || isNaN(lng)) {
+                alert('⚠️ Please enter valid latitude and longitude values');
                 return;
             }
 
-            trackingSocket.emit('updateCoordinate', { reportId, lat, lng });
-            log(`📨 Sent: updateCoordinate({ reportId: ${reportId}, lat: ${lat}, lng: ${lng} })`);
+            trackingSocket.emit('updateCoordinate', { lat, lng });
+            log(`📤 <strong>Sent coordinate:</strong> { lat: ${lat}, lng: ${lng} }`, 'event');
+            log('💡 Note: Only staff can broadcast coordinates. Admins will receive this update.', 'warning');
         }
 
-        function leaveTrackingRoom() {
+        function requestPositions() {
             if (!trackingSocket?.connected) {
-                alert('Please connect to /tracking first');
+                alert('⚠️ Please connect to /tracking first');
+                log('❌ Cannot request positions: Not connected to /tracking', 'error');
                 return;
             }
-            const reportId = document.getElementById('trackingReportId').value;
-            if (!reportId) {
-                alert('Please enter a Report ID');
-                return;
-            }
-            trackingSocket.emit('leaveReport', reportId);
-            log(`📨 Sent: leaveReport(${reportId})`);
+
+            trackingSocket.emit('requestAllPositions');
+            log(`📤 <strong>Requested all staff positions</strong>`, 'event');
+            log('💡 Note: Only admins can request positions. All staff will receive this request.', 'warning');
         }
 
         function clearLog() {
             document.getElementById('log').innerHTML = '';
+            log('🗑️ Log cleared');
         }
 
-        // Log initial message
-        log('WebSocket Test Client Ready. Enter your Supabase JWT token and connect.');
+        function exportLog() {
+            const logDiv = document.getElementById('log');
+            const logText = Array.from(logDiv.children)
+                .map(entry => entry.textContent)
+                .join('\n');
+
+            const blob = new Blob([logText], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `websocket-log-${new Date().toISOString()}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            log('💾 Log exported successfully');
+        }
+
+        // Initialize
+        log('✅ <strong>WebSocket Test Client Ready!</strong>');
+        log('📚 <strong>Quick Start Guide:</strong>');
+        log('1. Obtain a JWT token from <code>POST /auth/login</code>');
+        log('2. Paste the token in the field above');
+        log('3. Click "Connect to /alerts" or "Connect to /tracking"');
+        log('4. Watch this log for real-time events');
+        log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     </script>
 </body>
 </html>

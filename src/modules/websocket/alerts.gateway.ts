@@ -1,10 +1,9 @@
 import { WebSocketGateway, WebSocketServer, OnGatewayConnection, OnGatewayDisconnect } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Logger, UseGuards } from '@nestjs/common';
+import { Logger, ExecutionContext } from '@nestjs/common';
 import { WsAuthGuard } from './websocket-auth.guard';
 import { ReportStatus } from '../../enums/user-role.enum';
 
-@UseGuards(WsAuthGuard)
 @WebSocketGateway({
 	cors: {
 		origin: '*',
@@ -16,17 +15,25 @@ export class AlertsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 	@WebSocketServer()
 	server: Server;
 
-	constructor() {}
+	constructor(private wsAuthGuard: WsAuthGuard) {}
 
 	async handleConnection(client: Socket) {
-		const userId = client.data.userId;
-		const role = client.data.role;
+		// Use the guard to authenticate
+		const context = {
+			switchToWs: () => ({
+				getClient: () => client,
+			}),
+		} as ExecutionContext;
 
-		if (!userId || !role) {
-			Logger.log('[Alerts] No user data, disconnecting...');
-			client.disconnect();
+		const isAuthenticated = await this.wsAuthGuard.canActivate(context);
+
+		if (!isAuthenticated) {
+			Logger.log('[Alerts] Authentication failed, client disconnected by guard');
 			return;
 		}
+
+		const userId = client.data.userId;
+		const role = client.data.role;
 
 		Logger.log(`[Alerts] Client connected: ${userId} (${role})`);
 
