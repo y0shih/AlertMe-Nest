@@ -138,14 +138,10 @@ export class ReportsService {
 		});
 		const saved = await this.reportRepository.save(report);
 
-		// Emit WebSocket event to all admins
+		// Emit WebSocket event to everyone
 		this.alertsGateway.emitNewReport({
 			reportId: saved.id,
-			name: saved.name,
-			lat: saved.lat,
-			lng: saved.lng,
-			userId: saved.user_id,
-			createdAt: saved.created_at,
+			status: saved.status,
 		});
 
 		return saved;
@@ -162,14 +158,9 @@ export class ReportsService {
 		const saved = await this.sosReportRepository.save(sos);
 		await this.notificationsService.notifySos(saved);
 
-		// Emit WebSocket event to all admins and staff
+		// Emit WebSocket event to staff and admins
 		this.alertsGateway.emitSosAlert({
-			sosId: saved.id,
-			name: 'SOS Alert',
-			lat: saved.lat,
-			lng: saved.lng,
-			userId: saved.user_id,
-			createdAt: saved.created_at,
+			reportId: saved.id,
 		});
 
 		return saved;
@@ -213,13 +204,6 @@ export class ReportsService {
 			await this.reportRepository.update(reportId, { status: ReportStatus.IN_PROGRESS });
 		}
 
-		// Emit WebSocket event to assigned staff
-		this.alertsGateway.emitTaskAssigned({
-			taskId: savedTask.id,
-			reportId,
-			staffIds: staffUserIds,
-		});
-
 		return savedTask;
 	}
 
@@ -236,25 +220,6 @@ export class ReportsService {
 		const updatedReport = await this.findById(reportId);
 		if (!updatedReport) {
 			throw new Error(`Report with ID ${reportId} not found after update`);
-		}
-
-		// Emit WebSocket events for RESOLVED and CLOSED status
-		if (status === ReportStatus.RESOLVED || status === ReportStatus.CLOSED) {
-			const assignedStaffIds = updatedReport.tasks.flatMap((task) => task.assignedStaff?.map((staff) => staff.id) || []);
-
-			if (status === ReportStatus.RESOLVED) {
-				this.alertsGateway.emitReportResolved({
-					reportId,
-					userId: updatedReport.user_id,
-					assignedStaffIds,
-				});
-			} else if (status === ReportStatus.CLOSED) {
-				this.alertsGateway.emitReportClosed({
-					reportId,
-					userId: updatedReport.user_id,
-					assignedStaffIds,
-				});
-			}
 		}
 
 		return updatedReport;
@@ -318,18 +283,6 @@ export class ReportsService {
 
 		const savedResponse = await this.reportResponseRepository.save(response);
 
-		// Emit WebSocket event to report room
-		this.alertsGateway.emitReportResponseCreated({
-			responseId: savedResponse.id,
-			reportId,
-			taskId,
-			respondedBy: staffUserId,
-			responseText,
-			attachmentPaths,
-			lat,
-			lng,
-		});
-
 		// Auto-transition task status based on current state
 		if (task.status === TaskStatus.NOT_RECEIVED) {
 			// First update: NOT_RECEIVED -> RECEIVED (task acknowledged)
@@ -368,13 +321,6 @@ export class ReportsService {
 
 		// Increment task_completed counter for all assigned staff members
 		await Promise.all(task.assignedStaff.map((staff) => this.staffRepository.increment({ id: staff.id }, 'task_completed', 1)));
-
-		// Emit WebSocket event to admins
-		this.alertsGateway.emitTaskCompleted({
-			taskId,
-			reportId,
-			completedBy: staffUserId,
-		});
 
 		const completedTask = await this.taskRepository.findOne({
 			where: { id: taskId },

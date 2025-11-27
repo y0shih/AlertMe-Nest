@@ -85,7 +85,6 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 				staffId: userId,
 				lat: data.lat,
 				lng: data.lng,
-				timestamp: new Date(),
 			});
 
 			Logger.log(`[Tracking] Staff ${userId} broadcasted coordinates to all admins`);
