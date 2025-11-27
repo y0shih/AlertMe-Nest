@@ -31,7 +31,7 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 	}
 
 	private validateCoordinateData(data: any): boolean {
-		return data && typeof data === 'object' && this.validateReportId(data.reportId) && typeof data.lat === 'number' && typeof data.lng === 'number';
+		return data && typeof data === 'object' && typeof data.lat === 'number' && typeof data.lng === 'number';
 	}
 
 	async handleConnection(client: Socket) {
@@ -50,6 +50,13 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 		if (role !== 'staff' && role !== 'admin' && role !== 'superadmin') {
 			Logger.log(`[Tracking] Unauthorized role: ${role}, disconnecting...`);
 			client.disconnect();
+			return;
+		}
+
+		// Auto-join admins to the admins room for receiving all staff coordinates
+		if (role === 'admin' || role === 'superadmin') {
+			void client.join('admins');
+			Logger.log(`[Tracking] ${userId} joined admins room`);
 		}
 	}
 
@@ -106,10 +113,10 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 	}
 
 	/**
-	 * Staff broadcasts GPS coordinates
+	 * Staff broadcasts GPS coordinates to all admins
 	 */
 	@SubscribeMessage('updateCoordinate')
-	handleUpdateCoordinate(@ConnectedSocket() client: Socket, @MessageBody() data: { reportId: string; lat: number; lng: number }) {
+	handleUpdateCoordinate(@ConnectedSocket() client: Socket, @MessageBody() data: { lat: number; lng: number }) {
 		const userId = client.data.userId;
 		const role = client.data.role;
 
@@ -120,16 +127,15 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 
 		// Only staff can broadcast coordinates
 		if (role === 'staff') {
-			// Broadcast to all in report room (other staff + admins)
-			// Note: Does NOT include report owner (user)
-			this.server.to(`report_${data.reportId}`).emit('coordinateUpdate', {
+			// Broadcast to all admins regardless of report
+			this.server.to('admins').emit('coordinateUpdate', {
 				staffId: userId,
 				lat: data.lat,
 				lng: data.lng,
 				timestamp: new Date(),
 			});
 
-			Logger.log(`[Tracking] Staff ${userId} updated coordinates for report ${data.reportId}`);
+			Logger.log(`[Tracking] Staff ${userId} broadcasted coordinates to all admins`);
 		}
 	}
 
