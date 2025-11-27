@@ -10,7 +10,6 @@ import {
 import { Server, Socket } from 'socket.io';
 import { Logger, UseGuards } from '@nestjs/common';
 import { WsAuthGuard } from './websocket-auth.guard';
-import { validate as uuidValidate } from 'uuid';
 
 @UseGuards(WsAuthGuard)
 @WebSocketGateway({
@@ -25,10 +24,6 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 	server: Server;
 
 	constructor() {}
-
-	private validateReportId(reportId: any): boolean {
-		return !!(reportId && typeof reportId === 'string' && reportId.trim() !== '' && uuidValidate(reportId));
-	}
 
 	private validateCoordinateData(data: any): boolean {
 		return data && typeof data === 'object' && typeof data.lat === 'number' && typeof data.lng === 'number';
@@ -53,63 +48,21 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 			return;
 		}
 
-		// Auto-join admins to the admins room for receiving all staff coordinates
+		// Auto-join users to their respective rooms
 		if (role === 'admin' || role === 'superadmin') {
 			void client.join('admins');
 			Logger.log(`[Tracking] ${userId} joined admins room`);
+		}
+
+		if (role === 'staff') {
+			void client.join('staff');
+			Logger.log(`[Tracking] ${userId} joined staff room`);
 		}
 	}
 
 	handleDisconnect(client: Socket) {
 		const userId = client.data.userId;
 		Logger.log(`[Tracking] Client disconnected: ${userId}`);
-	}
-
-	/**
-	 * Staff/Admin joins a report tracking room
-	 */
-	@SubscribeMessage('joinReport')
-	handleJoinReport(@ConnectedSocket() client: Socket, @MessageBody() reportId: string) {
-		const userId = client.data.userId;
-		const role = client.data.role;
-
-		if (!this.validateReportId(reportId)) {
-			Logger.log('[Tracking] Invalid reportId in joinReport');
-			return;
-		}
-
-		// Only staff and admin can join tracking
-		if (role === 'staff' || role === 'admin' || role === 'superadmin') {
-			void client.join(`report_${reportId}`);
-			Logger.log(`[Tracking] ${userId} joined report_${reportId}`);
-
-			// Notify others in tracking room
-			client.to(`report_${reportId}`).emit('userJoinedTracking', {
-				userId,
-				role,
-			});
-		}
-	}
-
-	/**
-	 * Staff/Admin leaves a report tracking room
-	 */
-	@SubscribeMessage('leaveReport')
-	handleLeaveReport(@ConnectedSocket() client: Socket, @MessageBody() reportId: string) {
-		const userId = client.data.userId;
-
-		if (!this.validateReportId(reportId)) {
-			Logger.log('[Tracking] Invalid reportId in leaveReport');
-			return;
-		}
-
-		void client.leave(`report_${reportId}`);
-		Logger.log(`[Tracking] ${userId} left report_${reportId}`);
-
-		// Notify others
-		client.to(`report_${reportId}`).emit('userLeftTracking', {
-			userId,
-		});
 	}
 
 	/**
@@ -127,7 +80,7 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 
 		// Only staff can broadcast coordinates
 		if (role === 'staff') {
-			// Broadcast to all admins regardless of report
+			// Broadcast to all admins
 			this.server.to('admins').emit('coordinateUpdate', {
 				staffId: userId,
 				lat: data.lat,
@@ -140,25 +93,19 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 	}
 
 	/**
-	 * Admin requests current positions of all staff in a report
+	 * Admin requests current positions of all staff
 	 */
-	@SubscribeMessage('requestPositions')
-	handleRequestPositions(@ConnectedSocket() client: Socket, @MessageBody() reportId: string) {
+	@SubscribeMessage('requestAllPositions')
+	handleRequestAllPositions(@ConnectedSocket() client: Socket) {
+		const userId = client.data.userId;
 		const role = client.data.role;
-
-		if (!this.validateReportId(reportId)) {
-			Logger.log('[Tracking] Invalid reportId in requestPositions');
-			return;
-		}
 
 		// Only admins can request positions
 		if (role === 'admin' || role === 'superadmin') {
-			// Broadcast request to all staff in the room
-			this.server.to(`report_${reportId}`).emit('positionRequest', {
-				reportId,
-			});
+			// Broadcast request to all staff
+			this.server.to('staff').emit('positionRequest');
 
-			Logger.log(`[Tracking] Admin requested positions for report ${reportId}`);
+			Logger.log(`[Tracking] Admin ${userId} requested all staff positions`);
 		}
 	}
 }
