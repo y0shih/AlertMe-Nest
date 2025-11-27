@@ -22,6 +22,9 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 	@WebSocketServer()
 	server: Server;
 
+	private connectedStaff: Set<string> = new Set();
+	private staffCoordinates: Map<string, { lat: number; lng: number }> = new Map();
+
 	constructor(private wsAuthGuard: WsAuthGuard) {}
 
 	private validateCoordinateData(data: any): boolean {
@@ -43,7 +46,7 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 			return;
 		}
 
-		const userId = client.data.userId;
+		const userId = client.data.userId as string;
 		const role = client.data.role;
 
 		Logger.log(`[Tracking] Client connected: ${userId} (${role})`);
@@ -68,8 +71,18 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 	}
 
 	handleDisconnect(client: Socket) {
-		const userId = client.data.userId;
+		const userId = client.data.userId as string;
+		const role = client.data.role;
 		Logger.log(`[Tracking] Client disconnected: ${userId}`);
+
+		// If staff disconnected, notify admins
+		if (role === 'staff' && this.connectedStaff.has(userId)) {
+			this.connectedStaff.delete(userId);
+			this.server.to('admins').emit('staffDisconnected', {
+				staffId: userId,
+			});
+			Logger.log(`[Tracking] Staff ${userId} disconnected, notified admins`);
+		}
 	}
 
 	/**
@@ -77,7 +90,7 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 	 */
 	@SubscribeMessage('updateCoordinate')
 	handleUpdateCoordinate(@ConnectedSocket() client: Socket, @MessageBody() data: { lat: number; lng: number }) {
-		const userId = client.data.userId;
+		const userId = client.data.userId as string;
 		const role = client.data.role;
 
 		if (!this.validateCoordinateData(data)) {
@@ -87,6 +100,12 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 
 		// Only staff can broadcast coordinates
 		if (role === 'staff') {
+			// Store the coordinates
+			this.staffCoordinates.set(userId, {
+				lat: data.lat,
+				lng: data.lng,
+			});
+
 			// Broadcast to all admins
 			this.server.to('admins').emit('coordinateUpdate', {
 				staffId: userId,
@@ -103,7 +122,7 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 	 */
 	@SubscribeMessage('requestAllPositions')
 	handleRequestAllPositions(@ConnectedSocket() client: Socket) {
-		const userId = client.data.userId;
+		const userId = client.data.userId as string;
 		const role = client.data.role;
 
 		// Only admins can request positions
