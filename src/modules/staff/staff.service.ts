@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, In } from 'typeorm';
 import { Staff } from '../../entities/staff.entity';
 import { StaffProfile } from '../../entities/staff-profile.entity';
 import { Role } from '../../entities/role.entity';
@@ -111,12 +111,15 @@ export class StaffService {
 	}
 
 	async findMany(ids: string[]): Promise<StaffResponseDto[]> {
-		if (!ids || ids.length === 0) {
+		if (!ids || ids.length === 0 || ids.some((id) => !id)) {
 			return [];
 		}
 
 		const staff = await this.staffRepository.find({
-			where: ids.map((id) => ({ id })),
+			where: {
+				id: In(ids),
+				status: StaffStatus.ACTIVE,
+			},
 			relations: ['profile', 'role', 'profile.assignedTasks', 'profile.assignedTasks.report'],
 		});
 
