@@ -419,9 +419,13 @@
                 log(`🚨 <strong>SOS ALERT:</strong> ${JSON.stringify(data, null, 2)}`, 'event');
             });
 
+            alertsSocket.on('staffAssignment', (data) => {
+                log(`👷 <strong>STAFF ASSIGNMENT:</strong> ${JSON.stringify(data, null, 2)}`, 'event');
+            });
+
             // Catch-all for any other events
             alertsSocket.onAny((eventName, data) => {
-                if (eventName !== 'connect' && eventName !== 'disconnect' && eventName !== 'newReport' && eventName !== 'sosAlert') {
+                if (eventName !== 'connect' && eventName !== 'disconnect' && eventName !== 'newReport' && eventName !== 'sosAlert' && eventName !== 'staffAssignment') {
                     log(`📢 [ALERTS] <strong>${eventName}:</strong> ${JSON.stringify(data, null, 2)}`, 'event');
                 }
             });

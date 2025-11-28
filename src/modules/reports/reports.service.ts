@@ -204,6 +204,11 @@ export class ReportsService {
 			await this.reportRepository.update(reportId, { status: ReportStatus.IN_PROGRESS });
 		}
 
+		// Emit WebSocket notification to admins about staff assignment
+		staffUserIds.forEach((staffId) => {
+			this.alertsGateway.emitStaffAssignment(staffId);
+		});
+
 		return savedTask;
 	}
 

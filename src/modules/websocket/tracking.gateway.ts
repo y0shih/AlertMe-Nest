@@ -82,7 +82,7 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 	}
 
 	/**
-	 * Staff broadcasts GPS coordinates to all admins
+	 * Staff broadcasts GPS coordinates to all admins and other staff
 	 */
 	@SubscribeMessage('updateCoordinate')
 	handleUpdateCoordinate(@ConnectedSocket() client: Socket, @MessageBody() data: { lat: number; lng: number }) {
@@ -96,31 +96,19 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 
 		// Only staff can broadcast coordinates
 		if (role === 'staff') {
-			// Broadcast to all admins
-			this.server.to('admins').emit('coordinateUpdate', {
+			const payload = {
 				staffId: userId,
 				lat: data.lat,
 				lng: data.lng,
-			});
+			};
 
-			Logger.log(`[Tracking] Staff ${userId} broadcasted coordinates to all admins`);
-		}
-	}
+			// Broadcast to all admins
+			this.server.to('admins').emit('coordinateUpdate', payload);
 
-	/**
-	 * Admin requests current positions of all staff
-	 */
-	@SubscribeMessage('requestAllPositions')
-	handleRequestAllPositions(@ConnectedSocket() client: Socket) {
-		const userId = client.data.userId as string;
-		const role = client.data.role;
+			// Broadcast to all staff
+			this.server.to('staff').emit('coordinateUpdate', payload);
 
-		// Only admins can request positions
-		if (role === 'admin' || role === 'superadmin') {
-			// Broadcast request to all staff
-			this.server.to('staff').emit('positionRequest');
-
-			Logger.log(`[Tracking] Admin ${userId} requested all staff positions`);
+			Logger.log(`[Tracking] Staff ${userId} broadcasted coordinates to admins and staff`);
 		}
 	}
 }

@@ -46,6 +46,12 @@ export class AlertsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 			void client.join('staff_and_admins');
 			Logger.log(`[Alerts] ${userId} joined staff_and_admins room`);
 		}
+
+		// Admins join dedicated admins room
+		if (role === 'admin' || role === 'superadmin') {
+			void client.join('admins');
+			Logger.log(`[Alerts] ${userId} joined admins room`);
+		}
 	}
 
 	handleDisconnect(client: Socket) {
@@ -67,5 +73,13 @@ export class AlertsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 	emitSosAlert(sosData: { reportId: string }) {
 		this.server.to('staff_and_admins').emit('sosAlert', sosData);
 		Logger.log(`[Alerts] SOS alert broadcast to staff and admins: ${sosData.reportId}`);
+	}
+
+	/**
+	 * Broadcast staff assignment notification to admins only
+	 */
+	emitStaffAssignment(staffId: string) {
+		this.server.to('admins').emit('staffAssignment', { staffId });
+		Logger.log(`[Alerts] Staff assignment broadcast to admins: Staff ${staffId}`);
 	}
 }
