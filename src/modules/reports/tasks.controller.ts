@@ -1,7 +1,6 @@
 import { Controller, Get, Put, Param, Body, Query, UseGuards } from '@nestjs/common';
 import { ReportsService } from './reports.service';
 import { Task } from '../../entities/task.entity';
-import { Report } from '../../entities/report.entity';
 import { ReportResponse } from '../../entities/report-response.entity';
 import { UpdateTaskStatusDto, AddStatusUpdateDto, CompleteTaskDto } from '../../dto/tasks.dto';
 import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
@@ -16,6 +15,21 @@ import { TaskStatus } from '../../enums/user-role.enum';
 @Controller('tasks')
 export class TasksController {
 	constructor(private readonly reportsService: ReportsService) {}
+
+	// Staff: Get task counts by staff ID
+	@Get(':staffId/counts')
+	@ApiOperation({ summary: 'Get assigned and completed task counts by staff ID' })
+	@ApiParam({ name: 'staffId', description: 'Staff UUID' })
+	@Roles('staff', 'admin', 'superadmin')
+	async getTaskCountsByStaff(@Param('staffId') staffId: string): Promise<{ assignedTasks: number; completedTasks: number }> {
+		const assignedTasks = await this.reportsService.getAssignedTasks(staffId);
+		const completedTasks = assignedTasks.filter((task) => task.status === TaskStatus.COMPLETED);
+
+		return {
+			assignedTasks: assignedTasks.length,
+			completedTasks: completedTasks.length,
+		};
+	}
 
 	// Staff: Get assigned reports/tasks
 	@Get('assigned')

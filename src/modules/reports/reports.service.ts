@@ -224,7 +224,7 @@ export class ReportsService {
 
 		// Emit WebSocket notification to admins about staff assignment
 		staffUserIds.forEach((staffId) => {
-			this.alertsGateway.emitStaffAssignment(staffId);
+			this.alertsGateway.emitStaffAssignment(staffId, reportId);
 		});
 
 		return savedTask;

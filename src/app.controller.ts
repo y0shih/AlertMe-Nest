@@ -99,41 +99,82 @@ export class AppController {
 			required: ['urls'],
 		},
 	})
-	async deleteFile(@Body('urls') urls: string[]): Promise<{ message: string; deletedCount: number }> {
+	async deleteFile(@Body('urls') urls: string[]): Promise<{ message: string; deletedCount: number; skipped?: string[] }> {
 		if (!urls || urls.length === 0) {
 			throw new BadRequestException('URLs array is required and cannot be empty');
 		}
 
 		const filePaths: string[] = [];
+		const skippedUrls: string[] = [];
 
 		// Extract file paths from all URLs
 		for (const url of urls) {
-			// Extract the file path from the public URL
-			// URL format: https://{project}.supabase.co/storage/v1/object/public/{bucket}/{path}
-			const urlParts = url.split('/storage/v1/object/public/');
-			if (urlParts.length !== 2) {
-				throw new BadRequestException(`Invalid storage URL format: ${url}`);
+			// Skip if url is not a string or is empty
+			if (typeof url !== 'string' || !url || url.trim() === '') {
+				skippedUrls.push(url || 'empty/invalid');
+				continue;
 			}
 
-			const pathWithBucket = urlParts[1];
-			const pathParts = pathWithBucket.split('/');
+			try {
+				// Extract the file path from the public URL
+				// URL format: https://{project}.supabase.co/storage/v1/object/public/{bucket}/{path}
+				const urlParts = url.split('/storage/v1/object/public/');
 
-			// Remove the bucket name from the path
-			if (pathParts.length < 2) {
-				throw new BadRequestException(`Invalid file path in URL: ${url}`);
+				if (urlParts.length !== 2 || !urlParts[1]) {
+					// Invalid format, skip this URL
+					skippedUrls.push(url);
+					continue;
+				}
+
+				const pathWithBucket = urlParts[1].trim();
+				if (!pathWithBucket) {
+					skippedUrls.push(url);
+					continue;
+				}
+
+				const pathParts = pathWithBucket.split('/').filter((part) => part.length > 0);
+
+				// Need at least bucket name and file path
+				if (pathParts.length < 2) {
+					skippedUrls.push(url);
+					continue;
+				}
+
+				pathParts.shift(); // Remove bucket name
+				const filePath = pathParts.join('/');
+
+				if (filePath) {
+					filePaths.push(filePath);
+				} else {
+					skippedUrls.push(url);
+				}
+			} catch (error) {
+				// Catch any unexpected errors and skip this URL
+				skippedUrls.push(url);
 			}
-
-			pathParts.shift(); // Remove bucket name
-			const filePath = pathParts.join('/');
-			filePaths.push(filePath);
 		}
 
-		// Delete all files
+		// If no valid URLs were found, return early
+		if (filePaths.length === 0) {
+			throw new BadRequestException(
+				'No valid Supabase storage URLs found. Expected format: https://{project}.supabase.co/storage/v1/object/public/{bucket}/{path}',
+			);
+		}
+
+		// Delete all valid files
 		await Promise.all(filePaths.map((filePath) => this.storageService.deleteFile(filePath)));
 
-		return {
+		const response: { message: string; deletedCount: number; skipped?: string[] } = {
 			message: `Successfully deleted ${filePaths.length} file(s)`,
 			deletedCount: filePaths.length,
 		};
+
+		// Include skipped URLs in response if any
+		if (skippedUrls.length > 0) {
+			response.skipped = skippedUrls;
+			response.message += `, skipped ${skippedUrls.length} invalid URL(s)`;
+		}
+
+		return response;
 	}
 }

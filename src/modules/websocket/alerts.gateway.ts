@@ -78,9 +78,9 @@ export class AlertsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 	/**
 	 * Broadcast staff assignment notification to admins only
 	 */
-	emitStaffAssignment(staffId: string) {
-		this.server.to('admins').emit('staffAssignment', { staffId });
-		Logger.log(`[Alerts] Staff assignment broadcast to admins: Staff ${staffId}`);
+	emitStaffAssignment(staffId: string, reportId: string) {
+		this.server.to('admins').emit('staffAssignment', { staffId, reportId });
+		Logger.log(`[Alerts] Staff assignment broadcast to admins: Staff ${staffId} assigned to report ${reportId}`);
 	}
 
 	/**
