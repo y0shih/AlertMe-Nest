@@ -22,6 +22,7 @@ import { UsersModule } from './modules/users/users.module';
 import { StaffModule } from './modules/staff/staff.module';
 import { StorageModule } from './modules/storage/storage.module';
 import { WebsocketModule } from './modules/websocket/websocket.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 @Module({
 	imports: [
@@ -47,6 +48,7 @@ import { WebsocketModule } from './modules/websocket/websocket.module';
 		StaffModule,
 		StorageModule,
 		WebsocketModule,
+		DashboardModule,
 	],
 	controllers: [AppController],
 	providers: [AppService],

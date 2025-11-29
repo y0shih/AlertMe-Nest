@@ -82,4 +82,14 @@ export class AlertsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 		this.server.to('admins').emit('staffAssignment', { staffId });
 		Logger.log(`[Alerts] Staff assignment broadcast to admins: Staff ${staffId}`);
 	}
+
+	/**
+	 * Broadcast task completion to everyone
+	 */
+	emitTaskCompleted(taskData: { staffId: string; reportId: string; reportStatus: ReportStatus }) {
+		this.server.to('staff_and_admins').emit('taskCompleted', taskData);
+		Logger.log(
+			`[Alerts] Task completed broadcast to everyone: Staff ${taskData.staffId} completed task for report ${taskData.reportId} (${taskData.reportStatus})`,
+		);
+	}
 }

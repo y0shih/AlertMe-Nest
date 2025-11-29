@@ -44,10 +44,28 @@ export class ReportsService {
 	 * Get a single report by ID with all relations
 	 */
 	async findById(id: string): Promise<Report | null> {
-		return this.reportRepository.findOne({
-			where: { id },
-			relations: ['user', 'tasks', 'tasks.assignedBy', 'tasks.assignedStaff', 'responses'],
-		});
+		return this.reportRepository
+			.createQueryBuilder('report')
+			.leftJoinAndSelect('report.user', 'user')
+			.leftJoinAndSelect('report.tasks', 'tasks')
+			.leftJoinAndSelect('tasks.assignedBy', 'assignedBy')
+			.leftJoin('tasks.assignedStaff', 'assignedStaff')
+			.addSelect([
+				'assignedStaff.id',
+				'assignedStaff.username',
+				'assignedStaff.phone_number',
+				'assignedStaff.address',
+				'assignedStaff.city',
+				'assignedStaff.state',
+				'assignedStaff.postal_code',
+				'assignedStaff.country',
+				'assignedStaff.profilepic',
+				'assignedStaff.created_at',
+				'assignedStaff.updated_at',
+			])
+			.leftJoinAndSelect('report.responses', 'responses')
+			.where('report.id = :id', { id })
+			.getOne();
 	}
 
 	/**
@@ -335,6 +353,13 @@ export class ReportsService {
 		if (!completedTask) {
 			throw new Error(`Task with ID ${taskId} not found after update`);
 		}
+
+		// Emit WebSocket event for task completion
+		this.alertsGateway.emitTaskCompleted({
+			staffId: staffUserId,
+			reportId: reportId,
+			reportStatus: completedTask.report.status,
+		});
 
 		return completedTask;
 	}
