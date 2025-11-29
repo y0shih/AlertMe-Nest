@@ -8,6 +8,7 @@ import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiBearerAuth } from '@nestj
 import { SupabaseAuthGuard } from '../auth/supabase-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { TaskStatus } from '../../enums/user-role.enum';
 
 @ApiTags('Tasks (Staff)')
 @ApiBearerAuth('JWT-auth')
@@ -20,10 +21,11 @@ export class TasksController {
 	@Get('assigned')
 	@ApiOperation({ summary: 'List my assigned reports (Staff)' })
 	@ApiQuery({ name: 'staff_user_id', description: 'Staff user UUID', required: true })
+	@ApiQuery({ name: 'status', description: 'Filter by task status', required: false, enum: TaskStatus })
 	@Roles('staff', 'admin', 'superadmin')
-	async getAssignedTasks(@Query('staff_user_id') staffUserId: string): Promise<Task[]> {
+	async getAssignedTasks(@Query('staff_user_id') staffUserId: string, @Query('status') status?: TaskStatus): Promise<Task[]> {
 		// TODO: Extract staffUserId from auth token when auth is implemented
-		return this.reportsService.getAssignedTasks(staffUserId);
+		return this.reportsService.getAssignedTasks(staffUserId, status);
 	}
 
 	// Staff: Add status update with optional image

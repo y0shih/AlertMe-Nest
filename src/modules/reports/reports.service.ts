@@ -250,8 +250,9 @@ export class ReportsService {
 
 	/**
 	 * Get all tasks assigned to a specific staff member (for Staff role)
+	 * Optionally filter by task status
 	 */
-	async getAssignedTasks(staffUserId: string): Promise<Task[]> {
+	async getAssignedTasks(staffUserId: string, status?: TaskStatus): Promise<Task[]> {
 		const staff = await this.staffRepository.findOne({
 			where: { id: staffUserId },
 			relations: ['profile', 'profile.assignedTasks', 'profile.assignedTasks.report', 'profile.assignedTasks.report.user', 'profile.assignedTasks.assignedBy'],
@@ -261,7 +262,14 @@ export class ReportsService {
 			return [];
 		}
 
-		return staff.profile.assignedTasks.sort((a, b) => b.created_at.getTime() - a.created_at.getTime());
+		let tasks = staff.profile.assignedTasks;
+
+		// Filter by status if provided
+		if (status !== undefined) {
+			tasks = tasks.filter((task) => task.status === status);
+		}
+
+		return tasks.sort((a, b) => b.created_at.getTime() - a.created_at.getTime());
 	}
 
 	/**
