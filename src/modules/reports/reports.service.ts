@@ -44,12 +44,13 @@ export class ReportsService {
 	 * Get a single report by ID with all relations
 	 */
 	async findById(id: string): Promise<Report | null> {
-		return this.reportRepository
+		const report = await this.reportRepository
 			.createQueryBuilder('report')
 			.leftJoinAndSelect('report.user', 'user')
 			.leftJoinAndSelect('report.tasks', 'tasks')
 			.leftJoinAndSelect('tasks.assignedBy', 'assignedBy')
 			.leftJoin('tasks.assignedStaff', 'assignedStaff')
+			.leftJoinAndSelect('assignedStaff.staff', 'staff')
 			.addSelect([
 				'assignedStaff.id',
 				'assignedStaff.username',
@@ -66,6 +67,35 @@ export class ReportsService {
 			.leftJoinAndSelect('report.responses', 'responses')
 			.where('report.id = :id', { id })
 			.getOne();
+
+		// Flatten staff email and name into assignedStaff objects
+		if (report?.tasks) {
+			report.tasks = report.tasks.map((task) => {
+				if (task.assignedStaff) {
+					task.assignedStaff = task.assignedStaff.map((staffProfile) => {
+						const flattened: any = {
+							id: staffProfile.id,
+							username: staffProfile.username,
+							email: staffProfile.staff?.email || null,
+							name: staffProfile.staff?.name || null,
+							phone_number: staffProfile.phone_number,
+							address: staffProfile.address,
+							city: staffProfile.city,
+							state: staffProfile.state,
+							postal_code: staffProfile.postal_code,
+							country: staffProfile.country,
+							profilepic: staffProfile.profilepic,
+							created_at: staffProfile.created_at,
+							updated_at: staffProfile.updated_at,
+						};
+						return flattened;
+					});
+				}
+				return task;
+			});
+		}
+
+		return report;
 	}
 
 	/**
