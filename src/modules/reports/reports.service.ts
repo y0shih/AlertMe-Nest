@@ -8,6 +8,7 @@ import { ReportResponse } from '../../entities/report-response.entity';
 import { Staff } from '../../entities/staff.entity';
 import { ReportStatus, TaskStatus } from '../../enums/user-role.enum';
 import { CreateReportDto, CreateSosReportDto, ListReportsQueryDto } from '../../dto/reports.dto';
+import { AssignedTaskResponseDto, UserProfileResponseDto, ReportResponseDto } from '../../dto/tasks.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AlertsGateway } from '../websocket/alerts.gateway';
 
@@ -282,10 +283,17 @@ export class ReportsService {
 	 * Get all tasks assigned to a specific staff member (for Staff role)
 	 * Optionally filter by task status
 	 */
-	async getAssignedTasks(staffUserId: string, status?: TaskStatus): Promise<Task[]> {
+	async getAssignedTasks(staffUserId: string, status?: TaskStatus): Promise<AssignedTaskResponseDto[]> {
 		const staff = await this.staffRepository.findOne({
 			where: { id: staffUserId },
-			relations: ['profile', 'profile.assignedTasks', 'profile.assignedTasks.report', 'profile.assignedTasks.report.user', 'profile.assignedTasks.assignedBy'],
+			relations: [
+				'profile',
+				'profile.assignedTasks',
+				'profile.assignedTasks.report',
+				'profile.assignedTasks.report.user',
+				'profile.assignedTasks.report.user.authUser',
+				'profile.assignedTasks.assignedBy',
+			],
 		});
 
 		if (!staff?.profile?.assignedTasks) {
@@ -299,7 +307,53 @@ export class ReportsService {
 			tasks = tasks.filter((task) => task.status === status);
 		}
 
-		return tasks.sort((a, b) => b.created_at.getTime() - a.created_at.getTime());
+		// Transform tasks to DTOs with email and name in user object
+		const transformedTasks: AssignedTaskResponseDto[] = tasks.map((task) => {
+			const user = task.report?.user;
+			const userDto: UserProfileResponseDto = {
+				id: user?.id || '',
+				username: user?.username || '',
+				email: user?.authUser?.email || null,
+				phone_number: user?.phone_number || null,
+				address: user?.address || null,
+				city: user?.city || null,
+				state: user?.state || null,
+				postal_code: user?.postal_code || null,
+				country: user?.country || null,
+				profilepic: user?.profilepic || null,
+				created_at: user?.created_at,
+				updated_at: user?.updated_at,
+			};
+
+			const reportDto: ReportResponseDto = {
+				id: task.report?.id || '',
+				name: task.report?.name || '',
+				details: task.report?.details || '',
+				status: task.report?.status || '',
+				attachment_paths: task.report?.attachment_paths,
+				lat: task.report?.lat || 0,
+				lng: task.report?.lng || 0,
+				user_id: task.report?.user_id || '',
+				created_at: task.report?.created_at,
+				updated_at: task.report?.updated_at,
+				user: userDto,
+			};
+
+			const taskDto: AssignedTaskResponseDto = {
+				id: task.id,
+				report_id: task.report_id,
+				assigned_by: task.assigned_by,
+				task_details: task.task_details,
+				status: task.status,
+				created_at: task.created_at,
+				updated_at: task.updated_at,
+				report: reportDto,
+			};
+
+			return taskDto;
+		});
+
+		return transformedTasks.sort((a, b) => b.created_at.getTime() - a.created_at.getTime());
 	}
 
 	/**

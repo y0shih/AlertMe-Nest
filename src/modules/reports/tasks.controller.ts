@@ -2,8 +2,8 @@ import { Controller, Get, Put, Param, Body, Query, UseGuards } from '@nestjs/com
 import { ReportsService } from './reports.service';
 import { Task } from '../../entities/task.entity';
 import { ReportResponse } from '../../entities/report-response.entity';
-import { UpdateTaskStatusDto, AddStatusUpdateDto, CompleteTaskDto } from '../../dto/tasks.dto';
-import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
+import { UpdateTaskStatusDto, AddStatusUpdateDto, CompleteTaskDto, AssignedTaskResponseDto } from '../../dto/tasks.dto';
+import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiBearerAuth, ApiOkResponse } from '@nestjs/swagger';
 import { SupabaseAuthGuard } from '../auth/supabase-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -33,11 +33,12 @@ export class TasksController {
 
 	// Staff: Get assigned reports/tasks
 	@Get('assigned')
-	@ApiOperation({ summary: 'List my assigned reports (Staff)' })
+	@ApiOperation({ summary: 'List my assigned reports (Staff) - includes user email and name in response' })
 	@ApiQuery({ name: 'staff_user_id', description: 'Staff user UUID', required: true })
 	@ApiQuery({ name: 'status', description: 'Filter by task status', required: false, enum: TaskStatus })
+	@ApiOkResponse({ description: 'List of assigned tasks with user details including email and name', type: [AssignedTaskResponseDto] })
 	@Roles('staff', 'admin', 'superadmin')
-	async getAssignedTasks(@Query('staff_user_id') staffUserId: string, @Query('status') status?: TaskStatus): Promise<Task[]> {
+	async getAssignedTasks(@Query('staff_user_id') staffUserId: string, @Query('status') status?: TaskStatus): Promise<AssignedTaskResponseDto[]> {
 		// TODO: Extract staffUserId from auth token when auth is implemented
 		return this.reportsService.getAssignedTasks(staffUserId, status);
 	}

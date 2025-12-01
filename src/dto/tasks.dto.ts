@@ -103,3 +103,103 @@ export class UpdateTaskStatusDto {
 	@IsEnum(TaskStatus, { message: 'status must be a valid TaskStatus' })
 	status: TaskStatus;
 }
+
+// Response DTOs for GET assigned tasks
+export class UserProfileResponseDto {
+	@ApiProperty({ description: 'User profile ID', example: 'user-profile-uuid' })
+	id: string;
+
+	@ApiProperty({ description: 'Username', example: 'john_doe' })
+	username: string;
+
+	@ApiProperty({ description: 'User email address', example: 'john.doe@example.com', nullable: true })
+	email: string | null;
+
+	@ApiProperty({ description: 'Phone number', example: '+1234567890', nullable: true })
+	phone_number: string | null;
+
+	@ApiProperty({ description: 'Street address', example: '123 Main St', nullable: true })
+	address: string | null;
+
+	@ApiProperty({ description: 'City', example: 'New York', nullable: true })
+	city: string | null;
+
+	@ApiProperty({ description: 'State or province', example: 'NY', nullable: true })
+	state: string | null;
+
+	@ApiProperty({ description: 'Postal code', example: '10001', nullable: true })
+	postal_code: string | null;
+
+	@ApiProperty({ description: 'Country', example: 'United States', nullable: true })
+	country: string | null;
+
+	@ApiProperty({ description: 'Profile picture URL', example: 'https://example.com/profile.jpg', nullable: true })
+	profilepic: string | null;
+
+	@ApiProperty({ description: 'Profile creation timestamp', example: '2024-01-15T10:30:00Z' })
+	created_at: Date;
+
+	@ApiProperty({ description: 'Profile last update timestamp', example: '2024-01-15T10:30:00Z' })
+	updated_at: Date;
+}
+
+export class ReportResponseDto {
+	@ApiProperty({ description: 'Report ID', example: 'report-uuid' })
+	id: string;
+
+	@ApiProperty({ description: 'Report name/title', example: 'Broken streetlight' })
+	name: string;
+
+	@ApiProperty({ description: 'Report details', example: 'The streetlight on Main St is not working' })
+	details: string;
+
+	@ApiProperty({ description: 'Report status', example: 'pending' })
+	status: string;
+
+	@ApiPropertyOptional({ description: 'Attachment file paths', type: [String] })
+	attachment_paths?: string[];
+
+	@ApiProperty({ description: 'Latitude coordinate', example: 14.5995 })
+	lat: number;
+
+	@ApiProperty({ description: 'Longitude coordinate', example: 120.9842 })
+	lng: number;
+
+	@ApiProperty({ description: 'User profile ID who created the report', example: 'user-profile-uuid' })
+	user_id: string;
+
+	@ApiProperty({ description: 'Report creation timestamp', example: '2024-01-15T10:30:00Z' })
+	created_at: Date;
+
+	@ApiProperty({ description: 'Report last update timestamp', example: '2024-01-15T10:30:00Z' })
+	updated_at: Date;
+
+	@ApiProperty({ description: 'User profile who created the report', type: UserProfileResponseDto })
+	user: UserProfileResponseDto;
+}
+
+export class AssignedTaskResponseDto {
+	@ApiProperty({ description: 'Task ID', example: 'task-uuid' })
+	id: string;
+
+	@ApiProperty({ description: 'Report ID', example: 'report-uuid' })
+	report_id: string;
+
+	@ApiProperty({ description: 'Admin ID who assigned the task', example: 'admin-uuid' })
+	assigned_by: string;
+
+	@ApiPropertyOptional({ description: 'Task details', example: 'Investigate and repair the streetlight' })
+	task_details?: string;
+
+	@ApiProperty({ description: 'Task status', enum: TaskStatus, example: TaskStatus.NOT_RECEIVED })
+	status: TaskStatus;
+
+	@ApiProperty({ description: 'Task creation timestamp', example: '2024-01-15T10:30:00Z' })
+	created_at: Date;
+
+	@ApiProperty({ description: 'Task last update timestamp', example: '2024-01-15T10:30:00Z' })
+	updated_at: Date;
+
+	@ApiProperty({ description: 'Report associated with this task', type: ReportResponseDto })
+	report: ReportResponseDto;
+}
