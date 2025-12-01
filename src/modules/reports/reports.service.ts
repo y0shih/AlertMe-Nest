@@ -413,7 +413,7 @@ export class ReportsService {
 
 	/**
 	 * Mark task as completed (for Staff role)
-	 * Note: Only Admin can mark the report as RESOLVED via updateReportStatus
+	 * Automatically resolves the report when any task is completed
 	 */
 	async completeTask(reportId: string, taskId: string, staffUserId: string): Promise<Task> {
 		const task = await this.taskRepository.findOne({
@@ -431,11 +431,14 @@ export class ReportsService {
 			throw new Error(`Staff member not assigned to this task`);
 		}
 
-		// Mark task as completed (does NOT resolve the report - Admin does that)
+		// Mark task as completed
 		await this.taskRepository.update(taskId, { status: TaskStatus.COMPLETED });
 
 		// Increment task_completed counter for all assigned staff members
 		await Promise.all(task.assignedStaff.map((staff) => this.staffRepository.increment({ id: staff.id }, 'task_completed', 1)));
+
+		// Mark the report as RESOLVED (one completed task resolves the report)
+		await this.reportRepository.update(reportId, { status: ReportStatus.RESOLVED });
 
 		const completedTask = await this.taskRepository.findOne({
 			where: { id: taskId },
@@ -446,11 +449,11 @@ export class ReportsService {
 			throw new Error(`Task with ID ${taskId} not found after update`);
 		}
 
-		// Emit WebSocket event for task completion
+		// Emit WebSocket event for task completion with resolved status
 		this.alertsGateway.emitTaskCompleted({
 			staffId: staffUserId,
 			reportId: reportId,
-			reportStatus: completedTask.report.status,
+			reportStatus: ReportStatus.RESOLVED,
 		});
 
 		return completedTask;
