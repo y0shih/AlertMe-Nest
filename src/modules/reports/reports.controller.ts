@@ -77,9 +77,9 @@ export class ReportsController {
 
 	// Admin: Update report status
 	@Put(':id/status')
-	@ApiOperation({ summary: 'Update report status (Admin)' })
+	@ApiOperation({ summary: 'Update report status (Admin, Staff)' })
 	@ApiParam({ name: 'id', description: 'Report UUID' })
-	@Roles('admin', 'superadmin')
+	@Roles('staff', 'admin', 'superadmin')
 	async updateStatus(@Param('id') reportId: string, @Body() dto: UpdateReportStatusDto): Promise<Report> {
 		return this.reportsService.updateReportStatus(reportId, dto.status as ReportStatus);
 	}
