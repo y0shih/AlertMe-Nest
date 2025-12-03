@@ -93,7 +93,7 @@ export class SosReportsController {
 	constructor(private readonly reportsService: ReportsService) {}
 
 	@Post()
-	@Roles('user', 'admin', 'superadmin')
+	@Roles('user', 'staff', 'admin', 'superadmin')
 	async createSos(@Body() dto: CreateSosReportDto): Promise<SosReport> {
 		return this.reportsService.createSosReport(dto, (dto as any).user_id);
 	}
