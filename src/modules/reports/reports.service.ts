@@ -438,7 +438,7 @@ export class ReportsService {
 		await Promise.all(task.assignedStaff.map((staff) => this.staffRepository.increment({ id: staff.id }, 'task_completed', 1)));
 
 		// Mark the report as RESOLVED (one completed task resolves the report)
-		await this.reportRepository.update(reportId, { status: ReportStatus.RESOLVED });
+		await this.reportRepository.update(reportId, { status: ReportStatus.RESOLVED, updated_at: new Date() });
 
 		const completedTask = await this.taskRepository.findOne({
 			where: { id: taskId },
