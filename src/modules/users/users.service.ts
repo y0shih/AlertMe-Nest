@@ -394,6 +394,7 @@ export class UsersService {
 		return {
 			id: user.id,
 			email: user.email,
+			name: user.profile?.username || '',
 			username: user.profile?.username || '',
 			is_new_user: undefined,
 			role: {
@@ -420,6 +421,7 @@ export class UsersService {
 		return {
 			id: admin.id,
 			email: admin.email,
+			name: admin.name,
 			username: admin.profile?.username || admin.name,
 			is_new_user: undefined,
 			role: {
@@ -446,6 +448,7 @@ export class UsersService {
 		return {
 			id: staff.id,
 			email: staff.email,
+			name: staff.name,
 			username: staff.profile?.username || staff.name,
 			is_new_user: staff.is_new_user,
 			role: {
