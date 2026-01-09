@@ -27,5 +27,11 @@ export default registerAs('database', (): TypeOrmModuleOptions => {
 		entities: ['dist/**/*.entity{.ts,.js}'],
 		migrations: ['dist/migrations/*{.ts,.js}'],
 		autoLoadEntities: true,
+		extra: {
+			max: 20,
+			idleTimeoutMillis: 30000,
+			connectionTimeoutMillis: 5000,
+			keepAlive: true,
+		},
 	};
 });
