@@ -2,6 +2,7 @@ import { Controller, Get, Post, Delete, Body, Query, UseInterceptors, UploadedFi
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiConsumes, ApiBody, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { AppService } from './app.service';
+import { DataSource } from 'typeorm';
 import { StorageService, MultipleUploadResult } from './modules/storage/storage.service';
 import { SupabaseAuthGuard } from './modules/auth/supabase-auth.guard';
 
@@ -11,12 +12,19 @@ export class AppController {
 	constructor(
 		private readonly appService: AppService,
 		private readonly storageService: StorageService,
+		private readonly dataSource: DataSource,
 	) {}
 
-	@Get()
-	@ApiOperation({ summary: 'Health check' })
-	getHello(): string {
-		return this.appService.getHello();
+	@Get('health')
+	@ApiOperation({ summary: 'Basic health check' })
+	getHealth(): { message: string; status: string; timestamp: string } {
+		return this.appService.getBasicHealth();
+	}
+
+	@Get('health/db')
+	@ApiOperation({ summary: 'Database health check - runs DB queries to keep connection alive' })
+	async getDbHealth(): Promise<{ message: string; dbStatus: string; timestamp: string }> {
+		return this.appService.getDbHealth(this.dataSource);
 	}
 
 	@Get('upload')
